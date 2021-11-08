@@ -1,4 +1,4 @@
-FROM hiroshiba/hiho-deep-docker-base:pytorch1.5.0-cuda9.0
+FROM pytorch/pytorch:1.9.0-cuda11.1-cudnn8-devel
 
 SHELL ["/bin/bash", "-c"]
 WORKDIR /app
