@@ -24,7 +24,9 @@ class DatasetConfig:
 
 @dataclass
 class NetworkConfig:
-    pass
+    input_size: int
+    hidden_size: int
+    output_size: int
 
 
 @dataclass

@@ -1,21 +1,31 @@
-from typing import NamedTuple
+from typing import Any
 
 import torch
-from hiho_pytorch_base.config import ModelConfig, NetworkConfig
-from hiho_pytorch_base.network.predictor import Predictor, create_predictor
-from pytorch_trainer import report
 from torch import Tensor, nn
 from torch.nn.functional import cross_entropy
 
+from hiho_pytorch_base.config import ModelConfig
+from hiho_pytorch_base.dataset import DatasetOutput
+from hiho_pytorch_base.network.predictor import Predictor
 
-class Networks(NamedTuple):
-    predictor: Predictor
+
+class ModelOutput:
+    def __init__(self, loss: Tensor, accuracy: Tensor, data_num: int):
+        self.loss = loss
+        self.accuracy = accuracy
+        self.data_num = data_num
 
 
-def create_network(config: NetworkConfig):
-    return Networks(
-        predictor=create_predictor(config),
-    )
+def reduce_result(results):
+    result = {}
+    sum_data_num = sum([r.data_num for r in results])
+    for key in ["loss", "accuracy"]:
+        values = [getattr(r, key) * r.data_num for r in results]
+        if isinstance(values[0], Tensor):
+            result[key] = torch.stack(values).sum() / sum_data_num
+        else:
+            result[key] = sum(values) / sum_data_num
+    return result
 
 
 def accuracy(output: Tensor, target: Tensor):
@@ -26,29 +36,21 @@ def accuracy(output: Tensor, target: Tensor):
 
 
 class Model(nn.Module):
-    def __init__(self, model_config: ModelConfig, networks: Networks):
+    def __init__(self, model_config: ModelConfig, predictor: Predictor):
         super().__init__()
         self.model_config = model_config
-        self.predictor = networks.predictor
+        self.predictor = predictor
 
-    def forward(
-        self,
-        feature: Tensor,
-        target: Tensor,
-    ):
-        feature = self.predictor(feature)
-        output = self.tail(feature, target)
-
+    def forward(self, data: DatasetOutput) -> ModelOutput:
+        feature = data["feature"]
+        target = data["target"]
+        
+        output = self.predictor(feature)
         loss = cross_entropy(output, target)
-
-        # report
-        values = dict(
+        acc = accuracy(output, target)
+        
+        return ModelOutput(
             loss=loss,
-            accuracy=accuracy(output, target),
+            accuracy=acc,
+            data_num=feature.shape[0],
         )
-        if not self.training:
-            weight = feature.shape[0]
-            values = {key: (l, weight) for key, l in values.items()}  # add weight
-        report(values, self)
-
-        return loss

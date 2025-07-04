@@ -147,6 +147,26 @@ project:
    - preprocess関数、_load_pathlist関数、get_datas関数追加
    - バリデーションデータ対応（valid_file設定）
    - typo修正（43行目input→data）
+9. ✅ **model.py最新化**: yukarin_sosoa/sosfdを参考に全面的に更新完了
+   - ModelOutput クラス導入（loss、accuracy、data_num）
+   - reduce_result関数追加（結果の統合処理）
+   - self.tail問題解決（predictor直接使用に変更）
+   - pytorch_trainer依存削除
+   - DatasetOutput対応の forward method実装
+10. ✅ **generator.py最新化**: yukarin_sosoa/sosfdを参考に更新完了
+    - インポートパス修正（library → hiho_pytorch_base）
+    - GeneratorOutput クラス導入
+    - to_tensor関数追加
+    - nn.Module継承のGenerator実装
+    - generate/forward メソッド両対応
+11. ✅ **network/predictor.py最新化**: 基本的な実装を追加完了
+    - シンプルなMLP実装（3層のLinear + ReLU + Dropout）
+    - NetworkConfig対応のcreate_predictor関数
+    - デフォルトパラメータ設定（input_size=128、hidden_size=256、output_size=10）
+12. ✅ **evaluator.py新規作成**: model.pyのlossを評価指標にした実装完了
+    - EvaluatorOutput クラス（loss、accuracy、data_num）
+    - Generator使用の評価システム
+    - cross_entropy loss計算とaccuracy計算
 
 ## 今後の作業
 
@@ -164,12 +184,14 @@ project:
 
 ### コーディング規約
 - フォーマッターはruffを使用する
+- 型アノテーション：`List[type]`、`Dict[str, type]`、`list[type]`、`dict[str, type]`は使用しない。従来のPython型（list、dict）を使用する
+- **互換性不要**: このプロジェクトは基準となるフレームワークのため、レガシー互換性コードは書かない
+- **デフォルト値禁止**: network/predictor.py等のコアコンポーネントでは引数にデフォルト値を設定しない（特にPredictorクラス）
 
 ## 注意事項
 
-- `src/hiho_pytorch_base/model.py:41`で`self.tail`メソッドが定義されていません
 - NetworkConfigとModelConfigは現在プレースホルダーのため、実際のネットワーク・モデル設定が必要です
-- **重要**: pytorch-trainerが削除されているため、学習システム（trainer.py、model.py）は現在動作しません
+- **重要**: pytorch-trainerが削除されているため、学習システム（trainer.py）は現在動作しません
 - 一部のファイルで古いインポートパス（`from library.xxx`）がまだ残っている可能性があります
-- Ruffによるコードチェックで143個のエラーが検出されているため、修正が必要
+- Ruffによるコードチェックでdocstring、unused imports等のエラーが残っている
 - tests/test_train.pyは現在無効化されています（pytorch-trainer削除のため）
