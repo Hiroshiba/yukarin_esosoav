@@ -5,21 +5,20 @@ from typing import Any, Dict
 
 import torch
 import yaml
-from pytorch_trainer.iterators import MultiprocessIterator
-from pytorch_trainer.training import Trainer, extensions
-from pytorch_trainer.training.updaters import StandardUpdater
-from tensorboardX import SummaryWriter
-
 from library.config import Config
 from library.dataset import create_dataset
 from library.model import Model, create_network
 from library.utility.pytorch_utility import AmpUpdater, init_weights, make_optimizer
 from library.utility.trainer_extension import TensorboardReport, WandbReport
 from library.utility.trainer_utility import LowValueTrigger, create_iterator
+from pytorch_trainer.iterators import MultiprocessIterator
+from pytorch_trainer.training import Trainer, extensions
+from pytorch_trainer.training.updaters import StandardUpdater
+from tensorboardX import SummaryWriter
 
 
 def create_trainer(
-    config_dict: Dict[str, Any],
+    config_dict: dict[str, Any],
     output: Path,
 ):
     # config

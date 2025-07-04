@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Callable, Dict
+from typing import Any, Dict
 
 import torch
 import torch_optimizer
@@ -43,8 +44,8 @@ def init_weights(model: torch.nn.Module, name: str):
     model.apply(_init_weights)
 
 
-def make_optimizer(config_dict: Dict[str, Any], model: nn.Module):
-    cp: Dict[str, Any] = deepcopy(config_dict)
+def make_optimizer(config_dict: dict[str, Any], model: nn.Module):
+    cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
     optimizer: Optimizer

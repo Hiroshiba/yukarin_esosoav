@@ -49,7 +49,7 @@ def create_iterator(
             )
 
 
-class BetterValueTrigger(object):
+class BetterValueTrigger:
     def __init__(self, key, compare, stock_num=5, trigger=(1, "epoch")):
         self._key = key
         self._better_values = []

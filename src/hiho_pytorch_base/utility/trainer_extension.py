@@ -39,7 +39,7 @@ class TensorboardReport(Extension):
 class WandbReport(Extension):
     def __init__(
         self,
-        config_dict: Dict[str, Any],
+        config_dict: dict[str, Any],
         project_category: str,
         project_name: str,
         output_dir: Path,

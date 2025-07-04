@@ -8,7 +8,7 @@ from yaml import SafeLoader
 from tests.utility import get_data_directory
 
 
-@pytest.fixture()
+@pytest.fixture
 def train_config_path():
     return get_data_directory() / "train_config.yaml"
 

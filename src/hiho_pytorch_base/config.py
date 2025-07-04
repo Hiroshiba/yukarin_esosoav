@@ -27,14 +27,14 @@ class ModelConfig:
 @dataclass
 class TrainConfig:
     batch_size: int
-    eval_batch_size: Optional[int]
+    eval_batch_size: int | None
     log_iteration: int
     eval_iteration: int
     snapshot_iteration: int
     stop_iteration: int
-    optimizer: Dict[str, Any]
-    weight_initializer: Optional[str] = None
-    num_processes: Optional[int] = None
+    optimizer: dict[str, Any]
+    weight_initializer: str | None = None
+    num_processes: int | None = None
     use_gpu: bool = True
     use_amp: bool = False
     use_multithread: bool = False
@@ -43,8 +43,8 @@ class TrainConfig:
 @dataclass
 class ProjectConfig:
     name: str
-    tags: Dict[str, Any] = field(default_factory=dict)
-    category: Optional[str] = None
+    tags: dict[str, Any] = field(default_factory=dict)
+    category: str | None = None
 
 
 @dataclass
@@ -56,11 +56,11 @@ class Config:
     project: ProjectConfig
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Config":
+    def from_dict(cls, d: dict[str, Any]) -> "Config":
         backward_compatible(d)
         return dataclass_utility.convert_from_dict(cls, d)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return dataclass_utility.convert_to_dict(self)
 
     def add_git_info(self):
@@ -68,5 +68,5 @@ class Config:
         self.project.tags["git-branch-name"] = get_branch_name()
 
 
-def backward_compatible(d: Dict[str, Any]):
+def backward_compatible(d: dict[str, Any]):
     pass

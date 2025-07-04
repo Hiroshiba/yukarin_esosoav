@@ -3,16 +3,15 @@ from typing import Union
 
 import numpy
 import torch
-
 from library.config import Config
 from library.network.predictor import Predictor, create_predictor
 
 
-class Generator(object):
+class Generator:
     def __init__(
         self,
         config: Config,
-        predictor: Union[Predictor, Path],
+        predictor: Predictor | Path,
         use_gpu: bool,
     ):
         self.config = config
@@ -26,7 +25,7 @@ class Generator(object):
 
     def generate(
         self,
-        feature: Union[numpy.ndarray, torch.Tensor],
+        feature: numpy.ndarray | torch.Tensor,
     ):
         if isinstance(feature, numpy.ndarray):
             feature = torch.from_numpy(feature)

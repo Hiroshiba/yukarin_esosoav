@@ -1,13 +1,13 @@
 import glob
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Union
 
 import numpy
+from library.config import DatasetConfig
 from torch.utils.data._utils.collate import default_convert
 from torch.utils.data.dataset import ConcatDataset, Dataset
-
-from library.config import DatasetConfig
 
 
 @dataclass
@@ -31,7 +31,7 @@ class LazyInputData:
 class FeatureTargetDataset(Dataset):
     def __init__(
         self,
-        datas: Sequence[Union[InputData, LazyInputData]],
+        datas: Sequence[InputData | LazyInputData],
     ):
         self.datas = datas
 
@@ -63,7 +63,7 @@ def create_dataset(config: DatasetConfig):
             feature_path=feature_path,
             target_path=target_path,
         )
-        for feature_path, target_path in zip(feature_paths, target_paths)
+        for feature_path, target_path in zip(feature_paths, target_paths, strict=False)
     ]
 
     if config.seed is not None:

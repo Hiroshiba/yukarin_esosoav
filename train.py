@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 
 import yaml
-
 from library.trainer import create_trainer
 
 

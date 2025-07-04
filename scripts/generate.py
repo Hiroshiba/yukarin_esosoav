@@ -8,6 +8,7 @@ from library.config import Config
 from library.dataset import create_dataset
 from library.generator import Generator
 from tqdm import tqdm
+
 from utility.save_arguments import save_arguments
 
 
@@ -25,15 +26,15 @@ def _get_predictor_model_path(
         paths = model_dir.glob(prefix + "*.pth")
         model_path = list(sorted(paths, key=_extract_number))[-1]
     else:
-        model_path = model_dir / (prefix + "{}.pth".format(iteration))
+        model_path = model_dir / (prefix + f"{iteration}.pth")
         assert model_path.exists()
     return model_path
 
 
 def generate(
     model_dir: Path,
-    model_iteration: Optional[int],
-    model_config: Optional[Path],
+    model_iteration: int | None,
+    model_config: Path | None,
     output_dir: Path,
     use_gpu: bool,
 ):
