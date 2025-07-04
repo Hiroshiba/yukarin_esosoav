@@ -5,12 +5,12 @@ from typing import Any, Dict
 
 import torch
 import yaml
-from library.config import Config
-from library.dataset import create_dataset
-from library.model import Model, create_network
-from library.utility.pytorch_utility import AmpUpdater, init_weights, make_optimizer
-from library.utility.trainer_extension import TensorboardReport, WandbReport
-from library.utility.trainer_utility import LowValueTrigger, create_iterator
+from hiho_pytorch_base.config import Config
+from hiho_pytorch_base.dataset import create_dataset
+from hiho_pytorch_base.model import Model, create_network
+from hiho_pytorch_base.utility.pytorch_utility import AmpUpdater, init_weights, make_optimizer
+from hiho_pytorch_base.utility.trainer_extension import TensorboardReport, WandbReport
+from hiho_pytorch_base.utility.trainer_utility import LowValueTrigger, create_iterator
 from pytorch_trainer.iterators import MultiprocessIterator
 from pytorch_trainer.training import Trainer, extensions
 from pytorch_trainer.training.updaters import StandardUpdater

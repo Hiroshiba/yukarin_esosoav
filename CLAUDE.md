@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `ProjectConfig`: プロジェクト設定（name、tags、category）
 
 ### 学習システム
-- `src/hiho_pytorch_base/trainer.py`: pytorch-trainerベースの学習システム
+- `src/hiho_pytorch_base/trainer.py`: pytorch-trainerベースの学習システム（現在は依存関係が削除されているため動作しない）
   - `create_trainer()`: 設定からTrainerオブジェクトを作成
   - TensorBoard、W&B統合
   - AMP（Automatic Mixed Precision）対応
@@ -38,6 +38,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 推論・生成
 - `src/hiho_pytorch_base/generator.py`: 学習済みモデルからの推論
 - `scripts/generate.py`: 推論スクリプト
+
+### テスト
+- `tests/generate_test_data.py`: テストデータ生成コード（10サンプルのfeature/target .npyファイル）
+- `tests/conftest.py`: pytest fixtures（テストデータ自動生成機能）
+- `tests/test_train.py`: 学習システムのテスト（現在はpytorch-trainer削除のため無効化）
 
 ## 主要なファイル
 
@@ -118,13 +123,17 @@ project:
 2. ✅ **PyTorch更新**: PyTorch 2.7.1に更新完了
 3. ✅ **SRCレイアウト**: コードをsrc/hiho_pytorch_base/ディレクトリに移行完了
 4. ✅ **Ruff導入**: コードフォーマッターとリンターを導入
+5. ✅ **テストデータ生成**: テスト用データ生成コードとpytest fixtures作成完了
+6. ✅ **インポートパス更新（部分）**: config.py, dataset.py, trainer.py, model.py, network/predictor.pyで`library` → `hiho_pytorch_base`に更新完了
+7. ✅ **.gitignore更新**: GitHub公式Python用テンプレートベースに更新完了
 
 ## 今後の作業
 
-1. **インポートパス更新**: `library` → `hiho_pytorch_base`への更新が必要
-2. **Ruffコード修正**: 143個のエラーを修正する必要（主にdocstring、unused imports等）
-3. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
-4. **テストデータセット**: テスト用データセット作成のためのコード追加
+1. **インポートパス更新（残り）**: 残りのファイルで`library` → `hiho_pytorch_base`への更新が必要
+2. **pytorch-trainer代替**: pytorch-trainerが削除されているため、torch.distributedまたは他の学習ライブラリへの移行が必要
+3. **Ruffコード修正**: 143個のエラーを修正する必要（主にdocstring、unused imports等）
+4. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
+5. **テストシステム復活**: pytorch-trainer代替実装後、test_train.pyを復活させる
 
 ## 開発ガイドライン
 
@@ -140,5 +149,7 @@ project:
 - `src/hiho_pytorch_base/dataset.py:43`にtypoがあります（`input`は`data`であるべき）
 - `src/hiho_pytorch_base/model.py:41`で`self.tail`メソッドが定義されていません
 - NetworkConfigとModelConfigは現在プレースホルダーのため、実際のネットワーク・モデル設定が必要です
-- インポートパスがまだ古い形式（`from library.xxx`）のままのため、`from hiho_pytorch_base.xxx`に更新が必要
+- **重要**: pytorch-trainerが削除されているため、学習システム（trainer.py、model.py）は現在動作しません
+- 一部のファイルで古いインポートパス（`from library.xxx`）がまだ残っている可能性があります
 - Ruffによるコードチェックで143個のエラーが検出されているため、修正が必要
+- tests/test_train.pyは現在無効化されています（pytorch-trainer削除のため）

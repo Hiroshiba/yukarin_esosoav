@@ -1,8 +1,8 @@
 from typing import NamedTuple
 
 import torch
-from library.config import ModelConfig, NetworkConfig
-from library.network.predictor import Predictor, create_predictor
+from hiho_pytorch_base.config import ModelConfig, NetworkConfig
+from hiho_pytorch_base.network.predictor import Predictor, create_predictor
 from pytorch_trainer import report
 from torch import Tensor, nn
 from torch.nn.functional import cross_entropy

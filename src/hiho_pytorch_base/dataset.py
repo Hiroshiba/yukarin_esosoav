@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Union
 
 import numpy
-from library.config import DatasetConfig
+from hiho_pytorch_base.config import DatasetConfig
 from torch.utils.data._utils.collate import default_convert
 from torch.utils.data.dataset import ConcatDataset, Dataset
 

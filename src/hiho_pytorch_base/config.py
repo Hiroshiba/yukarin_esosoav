@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from library.utility import dataclass_utility
-from library.utility.git_utility import get_branch_name, get_commit_id
+from hiho_pytorch_base.utility import dataclass_utility
+from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
 
 
 @dataclass

@@ -1,5 +1,5 @@
 import torch.nn.functional as F
-from library.config import NetworkConfig
+from hiho_pytorch_base.config import NetworkConfig
 from torch import Tensor, nn
 
 
