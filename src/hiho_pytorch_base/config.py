@@ -37,17 +37,19 @@ class ModelConfig:
 @dataclass
 class TrainConfig:
     batch_size: int
-    eval_batch_size: int | None
-    log_iteration: int
-    eval_iteration: int
-    snapshot_iteration: int
-    stop_iteration: int
+    eval_batch_size: int
+    log_epoch: int
+    eval_epoch: int
+    snapshot_epoch: int
+    stop_epoch: int
+    model_save_num: int
     optimizer: dict[str, Any]
+    scheduler: dict[str, Any] | None = None
     weight_initializer: str | None = None
-    num_processes: int | None = None
+    pretrained_predictor_path: Path | None = None
+    num_processes: int = 4
     use_gpu: bool = True
-    use_amp: bool = False
-    use_multithread: bool = False
+    use_amp: bool = True
 
 
 @dataclass

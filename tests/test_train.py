@@ -3,8 +3,9 @@
 # 将来的にpytorch-trainerの代替実装またはtorch.distributed等への移行が必要です
 
 import tempfile
-import pytest
 from pathlib import Path
+
+import pytest
 # from hiho_pytorch_base.trainer import create_trainer  # ModuleNotFoundError
 
 
@@ -17,13 +18,13 @@ from pathlib import Path
 #     # 一時的な出力ディレクトリを作成
 #     with tempfile.TemporaryDirectory() as temp_dir:
 #         output_path = Path(temp_dir) / "test_output"
-#         
+#
 #         # トレーナーを作成
 #         trainer = create_trainer(
 #             config_dict=test_config_dict,
 #             output=output_path
 #         )
-#         
+#
 #         # トレーナーが正常に作成されたかチェック
 #         assert trainer is not None
 #         assert output_path.exists()
@@ -38,16 +39,16 @@ from pathlib import Path
 #     # 一時的な出力ディレクトリを作成
 #     with tempfile.TemporaryDirectory() as temp_dir:
 #         output_path = Path(temp_dir) / "test_output"
-#         
+#
 #         # トレーナーを作成
 #         trainer = create_trainer(
 #             config_dict=test_config_dict,
 #             output=output_path
 #         )
-#         
+#
 #         # 学習を実行（設定では5イテレーションで停止）
 #         trainer.run()
-#         
+#
 #         # 学習後の確認
 #         assert trainer.updater.iteration >= test_config_dict["train"]["stop_iteration"]
 #         assert (output_path / "log").exists()
@@ -59,7 +60,7 @@ from pathlib import Path
 #     """
 #     from hiho_pytorch_base.dataset import create_dataset
 #     from hiho_pytorch_base.config import DatasetConfig
-#     
+#
 #     # DatasetConfigを作成
 #     dataset_config = DatasetConfig(
 #         feature_glob=test_dataset["feature_glob"],
@@ -67,10 +68,10 @@ from pathlib import Path
 #         test_num=3,
 #         seed=42
 #     )
-#     
+#
 #     # データセットを作成
 #     datasets = create_dataset(dataset_config)
-#     
+#
 #     # データセットが正しく作成されたかチェック
 #     assert "train" in datasets
 #     assert "test" in datasets
@@ -85,14 +86,14 @@ from pathlib import Path
 #     """
 #     from hiho_pytorch_base.model import Model, create_network
 #     from hiho_pytorch_base.config import Config
-#     
+#
 #     # Configを作成
 #     config = Config.from_dict(test_config_dict)
-#     
+#
 #     # ネットワークとモデルを作成
 #     networks = create_network(config.network)
 #     model = Model(model_config=config.model, networks=networks)
-#     
+#
 #     # モデルが正しく作成されたかチェック
 #     assert model is not None
 #     assert hasattr(model, "forward")

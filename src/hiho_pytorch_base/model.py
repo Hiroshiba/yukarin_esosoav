@@ -1,4 +1,5 @@
 from typing import Any
+from typing_extensions import TypedDict
 
 import torch
 from torch import Tensor, nn
@@ -6,21 +7,19 @@ from torch.nn.functional import cross_entropy
 
 from hiho_pytorch_base.config import ModelConfig
 from hiho_pytorch_base.dataset import DatasetOutput
-from hiho_pytorch_base.network.predictor import Predictor
 
 
-class ModelOutput:
-    def __init__(self, loss: Tensor, accuracy: Tensor, data_num: int):
-        self.loss = loss
-        self.accuracy = accuracy
-        self.data_num = data_num
+class ModelOutput(TypedDict):
+    loss: Tensor
+    accuracy: Tensor
+    data_num: int
 
 
-def reduce_result(results):
-    result = {}
-    sum_data_num = sum([r.data_num for r in results])
-    for key in ["loss", "accuracy"]:
-        values = [getattr(r, key) * r.data_num for r in results]
+def reduce_result(results: list[ModelOutput]):
+    result: dict[str, Any] = {}
+    sum_data_num = sum([r["data_num"] for r in results])
+    for key in set(results[0].keys()) - {"data_num"}:
+        values = [r[key] * r["data_num"] for r in results]
         if isinstance(values[0], Tensor):
             result[key] = torch.stack(values).sum() / sum_data_num
         else:
@@ -36,7 +35,7 @@ def accuracy(output: Tensor, target: Tensor):
 
 
 class Model(nn.Module):
-    def __init__(self, model_config: ModelConfig, predictor: Predictor):
+    def __init__(self, model_config: ModelConfig, predictor: nn.Module):
         super().__init__()
         self.model_config = model_config
         self.predictor = predictor
@@ -44,11 +43,11 @@ class Model(nn.Module):
     def forward(self, data: DatasetOutput) -> ModelOutput:
         feature = data["feature"]
         target = data["target"]
-        
+
         output = self.predictor(feature)
         loss = cross_entropy(output, target)
         acc = accuracy(output, target)
-        
+
         return ModelOutput(
             loss=loss,
             accuracy=acc,

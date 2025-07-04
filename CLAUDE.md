@@ -102,12 +102,19 @@ model: {}
 
 train:
   batch_size: 100
-  log_iteration: 1000
-  eval_iteration: 100000
-  stop_iteration: 100000
+  eval_batch_size: 10
+  log_epoch: 1
+  eval_epoch: 10
+  snapshot_epoch: 100
+  stop_epoch: 1000
+  model_save_num: 5
   optimizer:
     name: "adam"
     lr: 0.001
+  scheduler: null
+  num_processes: 4
+  use_gpu: true
+  use_amp: true
 
 project:
   name: null
@@ -120,6 +127,7 @@ project:
 - torch>=2.7.1
 - pyyaml>=6.0.2
 - tqdm>=4.67.1
+- torch-optimizer>=0.3.0
 
 ### 開発依存関係 (pyproject.toml [dependency-groups])
 - pytest>=8.4.1
@@ -148,8 +156,8 @@ project:
    - バリデーションデータ対応（valid_file設定）
    - typo修正（43行目input→data）
 9. ✅ **model.py最新化**: yukarin_sosoa/sosfdを参考に全面的に更新完了
-   - ModelOutput クラス導入（loss、accuracy、data_num）
-   - reduce_result関数追加（結果の統合処理）
+   - ModelOutput TypedDict化（loss、accuracy、data_num）
+   - reduce_result関数追加（辞書アクセス対応）
    - self.tail問題解決（predictor直接使用に変更）
    - pytorch_trainer依存削除
    - DatasetOutput対応の forward method実装
@@ -164,17 +172,41 @@ project:
     - NetworkConfig対応のcreate_predictor関数
     - デフォルトパラメータ設定（input_size=128、hidden_size=256、output_size=10）
 12. ✅ **evaluator.py新規作成**: model.pyのlossを評価指標にした実装完了
-    - EvaluatorOutput クラス（loss、accuracy、data_num）
+    - EvaluatorOutput TypedDict化（value、loss、accuracy、data_num）
     - Generator使用の評価システム
     - cross_entropy loss計算とaccuracy計算
+    - judge プロパティ追加（"min"/"max"判定用）
+13. ✅ **trainer.py削除とtrain.py作成**: pytorch-trainer代替実装完了
+    - trainer.pyを削除（参照プロジェクト準拠）
+    - train.pyを参照プロジェクト（yukarin_sosoa）ベースで新規作成
+    - torch.amp（新しいPyTorch API）使用
+    - torch.jit.script による predictor 最適化
+    - datasets["eval"] 使用、valid_dataset None 対応
+    - evaluator.judge を使用した SaveManager 実装
+14. ✅ **utility モジュール実装**: 参照プロジェクト準拠で新規作成
+    - utility/train_utility.py（Logger、SaveManager）
+    - utility/pytorch_utility.py（make_optimizer、make_scheduler、collate_list等）
+    - 新しいPyTorch API対応（torch.amp、WarmupLR等）
+15. ✅ **config.py エポックベース移行**: iteration → epoch ベースに更新完了
+    - TrainConfig を iteration ベースから epoch ベースに変更
+    - model_save_num、scheduler、pretrained_predictor_path 等フィールド追加
+    - 参照プロジェクト準拠の設定項目統一
+16. ✅ **torch_optimizer パッケージ追加**: uv add で依存関係追加完了
+    - torch-optimizer>=0.3.0 追加
+    - pytorch-ranger>=0.1.1 も自動インストール
+    - RAdam、Ranger等の最新オプティマイザ利用可能
+17. ✅ **型整合性修正**: 各種型エラー・実行時エラー対応完了
+    - Model コンストラクタ torch.jit.script 対応（nn.Module型に変更）
+    - valid_dataset None 対応処理追加
+    - target データ型修正（.float() → .long()、cross_entropy用）
+    - DatasetOutput/GeneratorOutput 型一貫性確保
 
 ## 今後の作業
 
 1. **インポートパス更新（残り）**: 残りのファイルで`library` → `hiho_pytorch_base`への更新が必要
-2. **pytorch-trainer代替**: pytorch-trainerが削除されているため、torch.distributedまたは他の学習ライブラリへの移行が必要
-3. **Ruffコード修正**: 143個のエラーを修正する必要（主にdocstring、unused imports等）
-4. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
-5. **テストシステム復活**: pytorch-trainer代替実装後、test_train.pyを復活させる
+2. **Ruffコード修正**: docstring、unused imports等のエラー修正が必要
+3. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
+4. **テストシステム復活**: train.py ベース実装に合わせて test_train.py を復活させる
 
 ## 開発ガイドライン
 
@@ -191,7 +223,7 @@ project:
 ## 注意事項
 
 - NetworkConfigとModelConfigは現在プレースホルダーのため、実際のネットワーク・モデル設定が必要です
-- **重要**: pytorch-trainerが削除されているため、学習システム（trainer.py）は現在動作しません
+- **学習システム**: pytorch-trainerは削除され、新しいtrain.pyでネイティブPyTorch学習ループが動作します
 - 一部のファイルで古いインポートパス（`from library.xxx`）がまだ残っている可能性があります
 - Ruffによるコードチェックでdocstring、unused imports等のエラーが残っている
-- tests/test_train.pyは現在無効化されています（pytorch-trainer削除のため）
+- tests/test_train.pyは現在無効化されています（train.pyベース実装への移行対応が必要）

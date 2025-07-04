@@ -1,5 +1,7 @@
-import pytest
 from pathlib import Path
+
+import pytest
+
 from tests.generate_test_data import ensure_test_data_exists
 
 
@@ -33,9 +35,9 @@ def test_dataset(test_feature_dir, test_target_dir):
         num_samples=10,
         feature_shape=(64,),
         num_classes=3,
-        seed=42
+        seed=42,
     )
-    
+
     return {
         "feature_dir": test_feature_dir,
         "target_dir": test_target_dir,
@@ -52,7 +54,7 @@ def test_config_dict(test_dataset):
             "feature_glob": test_dataset["feature_glob"],
             "target_glob": test_dataset["target_glob"],
             "test_num": 3,
-            "seed": 42
+            "seed": 42,
         },
         "network": {},
         "model": {},
@@ -63,16 +65,10 @@ def test_config_dict(test_dataset):
             "eval_iteration": 5,
             "snapshot_iteration": 10,
             "stop_iteration": 5,
-            "optimizer": {
-                "name": "adam",
-                "lr": 0.001
-            },
+            "optimizer": {"name": "adam", "lr": 0.001},
             "use_gpu": False,  # テストではCPUを使用
             "use_amp": False,
-            "use_multithread": False
+            "use_multithread": False,
         },
-        "project": {
-            "name": "test_project",
-            "category": "test"
-        }
+        "project": {"name": "test_project", "category": "test"},
     }

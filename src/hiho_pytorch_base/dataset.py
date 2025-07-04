@@ -39,7 +39,7 @@ def preprocess(d: DatasetInput) -> DatasetOutput:
     """前処理関数"""
     output_data = DatasetOutput(
         feature=torch.from_numpy(d.feature).float(),
-        target=torch.from_numpy(d.target).float(),
+        target=torch.from_numpy(d.target).long(),
     )
     return output_data
 

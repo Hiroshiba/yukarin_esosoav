@@ -43,10 +43,10 @@ class Generator(nn.Module):
 
     def forward(self, feature):
         feature = to_tensor(feature).to(self.device)
-        
+
         with torch.inference_mode():
             output = self.predictor(feature)
-        
+
         return GeneratorOutput(output=output)
 
     def generate(self, feature):
