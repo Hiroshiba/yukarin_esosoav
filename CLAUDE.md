@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 設定管理
 - `src/hiho_pytorch_base/config.py`: データクラスベースの設定管理
-  - `DatasetConfig`: データセット設定（feature_glob、target_glob、test_num等）
+  - `DatasetFileConfig`: ファイルパス設定（feature_pathlist_path、target_pathlist_path、root_dir）
+  - `DatasetConfig`: データセット設定（train_file、valid_file、test_num等）
   - `NetworkConfig`: ネットワーク設定（実装は空のプレースホルダー）
   - `ModelConfig`: モデル設定（実装は空のプレースホルダー）
   - `TrainConfig`: 学習設定（batch_size、optimizer、use_gpu等）
@@ -25,9 +26,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### データ処理
 - `src/hiho_pytorch_base/dataset.py`: データセット処理
-  - `FeatureTargetDataset`: numpy配列からのデータセット作成
-  - `LazyInputData`: 遅延読み込み対応
-  - globパターンでのファイル読み込み
+  - `DatasetInput`: feature/targetデータ構造
+  - `LazyDatasetInput`: 遅延読み込み対応
+  - `DatasetOutput`: TypedDictによるアウトプット定義
+  - `FeatureTargetDataset`: PyTorchデータセット実装
+  - `preprocess()`: 前処理関数
+  - `_load_pathlist()`: pathlistファイル読み込み
+  - `get_datas()`: データ取得関数
+  - `create_dataset()`: データセット作成（train/test/eval/valid対応）
+  - pathlistファイル方式でのファイル管理（yukarin_sosfd準拠）
 
 ### モデル・ネットワーク
 - `src/hiho_pytorch_base/model.py`: モデル定義
@@ -77,9 +84,16 @@ uv run ruff format
 YAML形式で設定を管理：
 ```yaml
 dataset:
-  feature_glob: "/path/to/feature-npy/*.npy"
-  target_glob: "/path/to/target-npy/*.npy"
+  train_file:
+    feature_pathlist_path: "/path/to/feature_pathlist.txt"
+    target_pathlist_path: "/path/to/target_pathlist.txt"
+    root_dir: "/path/to/data"
+  valid_file:  # optional
+    feature_pathlist_path: "/path/to/valid_feature_pathlist.txt"
+    target_pathlist_path: "/path/to/valid_target_pathlist.txt"
+    root_dir: "/path/to/valid_data"
   test_num: 100
+  eval_times_num: 1
   seed: 0
 
 network: {}
@@ -126,6 +140,13 @@ project:
 5. ✅ **テストデータ生成**: テスト用データ生成コードとpytest fixtures作成完了
 6. ✅ **インポートパス更新（部分）**: config.py, dataset.py, trainer.py, model.py, network/predictor.pyで`library` → `hiho_pytorch_base`に更新完了
 7. ✅ **.gitignore更新**: GitHub公式Python用テンプレートベースに更新完了
+8. ✅ **dataset.py最新化**: yukarin_sosoa/sosfdを参考に全面的に更新完了
+   - pathlist方式への移行（glob方式から変更）
+   - DatasetFileConfig導入によるスケーラブルな設定管理
+   - DatasetOutput TypedDict化
+   - preprocess関数、_load_pathlist関数、get_datas関数追加
+   - バリデーションデータ対応（valid_file設定）
+   - typo修正（43行目input→data）
 
 ## 今後の作業
 
@@ -146,7 +167,6 @@ project:
 
 ## 注意事項
 
-- `src/hiho_pytorch_base/dataset.py:43`にtypoがあります（`input`は`data`であるべき）
 - `src/hiho_pytorch_base/model.py:41`で`self.tail`メソッドが定義されていません
 - NetworkConfigとModelConfigは現在プレースホルダーのため、実際のネットワーク・モデル設定が必要です
 - **重要**: pytorch-trainerが削除されているため、学習システム（trainer.py、model.py）は現在動作しません

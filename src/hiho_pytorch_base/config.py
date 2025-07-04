@@ -1,15 +1,23 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any
 
 from hiho_pytorch_base.utility import dataclass_utility
 from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
 
 
 @dataclass
+class DatasetFileConfig:
+    feature_pathlist_path: Path
+    target_pathlist_path: Path
+    root_dir: Path
+
+
+@dataclass
 class DatasetConfig:
-    feature_glob: str
-    target_glob: str
+    train_file: DatasetFileConfig
     test_num: int
+    valid_file: DatasetFileConfig | None = None
     eval_times_num: int = 1
     seed: int = 0
 
