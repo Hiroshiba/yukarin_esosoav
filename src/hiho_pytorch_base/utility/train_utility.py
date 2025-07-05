@@ -1,9 +1,8 @@
 from pathlib import Path
-from typing import Any, Optional, Set, Tuple
+from typing import Any, Literal, Optional, Set, Tuple
 
 import numpy
 import torch
-from typing_extensions import Literal
 
 
 def _flatten_dict(dd, separator="/", prefix=""):
@@ -18,11 +17,11 @@ def _flatten_dict(dd, separator="/", prefix=""):
     )
 
 
-class Logger(object):
+class Logger:
     def __init__(
         self,
         config_dict: dict[str, Any],
-        project_category: Optional[str],
+        project_category: str | None,
         project_name: str,
         output_dir: Path,
     ):
@@ -79,7 +78,7 @@ class Logger(object):
         self.wandb_id = state_dict["wandb_id"]
 
 
-class SaveManager(object):
+class SaveManager:
     def __init__(
         self,
         predictor: torch.nn.Module,
@@ -95,13 +94,13 @@ class SaveManager(object):
         self.last_num = last_num
 
         self.last_steps: list[int] = []
-        self.top_step_values: list[Tuple[int, float]] = []
+        self.top_step_values: list[tuple[int, float]] = []
 
     def save(self, value: float, step: int, judge: Literal["min", "max"]):
         if numpy.isnan(value):
             return
 
-        delete_steps: Set[int] = set()
+        delete_steps: set[int] = set()
         judged = False
 
         # top N

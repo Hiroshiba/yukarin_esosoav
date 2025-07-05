@@ -1,9 +1,9 @@
 from typing import Any
-from typing_extensions import TypedDict
 
 import torch
 from torch import Tensor, nn
 from torch.nn.functional import cross_entropy
+from typing_extensions import TypedDict
 
 from hiho_pytorch_base.config import ModelConfig
 from hiho_pytorch_base.dataset import DatasetOutput
@@ -41,8 +41,8 @@ class Model(nn.Module):
         self.predictor = predictor
 
     def forward(self, data: DatasetOutput) -> ModelOutput:
-        feature = data["feature"]
-        target = data["target"]
+        feature = torch.stack(data["feature"])
+        target = torch.stack(data["target"])
 
         output = self.predictor(feature)
         loss = cross_entropy(output, target)

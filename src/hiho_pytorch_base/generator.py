@@ -54,6 +54,6 @@ class Generator(nn.Module):
             feature = torch.from_numpy(feature)
         feature = feature.to(self.device)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             output = self.predictor(feature)
         return output.cpu().numpy()

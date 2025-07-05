@@ -1,21 +1,39 @@
 dataset:
-  feature_glob: "/path/to/feature-npy/*.npy"
-  target_glob: "/path/to/target-npy/*.npy"
+  train_file:
+    feature_pathlist_path: "tests/data/test_data/train_feature_pathlist.txt"
+    target_pathlist_path: "tests/data/test_data/train_target_pathlist.txt"
+    root_dir: "tests/data/test_data"
+  valid_file:
+    feature_pathlist_path: "tests/data/test_data/valid_feature_pathlist.txt"
+    target_pathlist_path: "tests/data/test_data/valid_target_pathlist.txt"
+    root_dir: "tests/data/test_data"
   test_num: 100
-  seed: 0
+  eval_times_num: 1
+  seed: 42
 
-network: {}
+network:
+  input_size: 16
+  hidden_size: 32
+  output_size: 3
 
 model: {}
 
 train:
-  batch_size: 100
-  log_iteration: 1000
-  eval_iteration: 100000
-  stop_iteration: 100000
+  batch_size: 20
+  eval_batch_size: 20
+  log_epoch: 1
+  eval_epoch: 2
+  snapshot_epoch: 5
+  stop_epoch: 3
+  model_save_num: 2
   optimizer:
     name: "adam"
     lr: 0.001
+  scheduler: null
+  num_processes: 1
+  use_gpu: false
+  use_amp: false
 
 project:
-  name: null
+  name: "test_project"
+  category: "test"

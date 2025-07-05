@@ -75,10 +75,10 @@ class Config:
     def to_dict(self) -> dict[str, Any]:
         return dataclass_utility.convert_to_dict(self)
 
-    def add_git_info(self):
+    def add_git_info(self) -> None:
         self.project.tags["git-commit-id"] = get_commit_id()
         self.project.tags["git-branch-name"] = get_branch_name()
 
 
-def backward_compatible(d: dict[str, Any]):
+def backward_compatible(d: dict[str, Any]) -> None:
     pass

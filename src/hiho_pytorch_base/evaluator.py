@@ -1,7 +1,7 @@
+from typing import Literal, TypedDict
+
 import torch
 from torch import Tensor, nn
-from typing import TypedDict
-from typing_extensions import Literal
 
 from hiho_pytorch_base.dataset import DatasetOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
@@ -22,8 +22,8 @@ class Evaluator(nn.Module):
         self.generator = generator
 
     def forward(self, data: DatasetOutput) -> EvaluatorOutput:
-        feature = data["feature"]
-        target = data["target"]
+        feature = torch.stack(data["feature"])
+        target = torch.stack(data["target"])
 
         output_result: GeneratorOutput = self.generator(feature)
         output = output_result.output

@@ -207,6 +207,7 @@ project:
 2. **Ruffコード修正**: docstring、unused imports等のエラー修正が必要
 3. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
 4. **テストシステム復活**: train.py ベース実装に合わせて test_train.py を復活させる
+5. **Pydantic設定システム**: dataclassの代わりにPydanticを使ってconfigファイルをロードする
 
 ## 開発ガイドライン
 
@@ -215,8 +216,15 @@ project:
 - これらのプロジェクトのどれかに実装があれば、それを真似するようにする
 
 ### コーディング規約
-- フォーマッターはruffを使用する
-- 型アノテーション：`List[type]`、`Dict[str, type]`、`list[type]`、`dict[str, type]`は使用しない。従来のPython型（list、dict）を使用する
+- **フォーマッター**: ruffを使用する
+  ```bash
+  uv run ruff check --fix
+  uv run ruff format
+  ```
+- **型アノテーション**: 全ての関数の引数と返り値に型アノテーションを必ず記述する
+  - 従来のPython型（`list`、`dict`）を使用し、`List[type]`、`Dict[str, type]`は使用しない
+  - 複雑な型は`typing.Any`を使用
+  - 例: `def function(param: str, data: dict[str, Any]) -> None:`
 - **互換性不要**: このプロジェクトは基準となるフレームワークのため、レガシー互換性コードは書かない
 - **デフォルト値禁止**: network/predictor.py等のコアコンポーネントでは引数にデフォルト値を設定しない（特にPredictorクラス）
 

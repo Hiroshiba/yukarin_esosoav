@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from typing import Any
 
 import torch
 import yaml
@@ -24,7 +25,7 @@ from hiho_pytorch_base.utility.pytorch_utility import (
 from hiho_pytorch_base.utility.train_utility import Logger, SaveManager
 
 
-def train(config_yaml_path: Path, output_dir: Path):
+def train(config_yaml_path: Path, output_dir: Path) -> None:
     # config
     with config_yaml_path.open() as f:
         config_dict = yaml.safe_load(f)
@@ -32,7 +33,7 @@ def train(config_yaml_path: Path, output_dir: Path):
     config.add_git_info()
 
     # dataset
-    def _create_loader(dataset, for_train: bool, for_eval: bool):
+    def _create_loader(dataset: Any, for_train: bool, for_eval: bool) -> DataLoader:
         batch_size = (
             config.train.eval_batch_size if for_eval else config.train.batch_size
         )
@@ -52,7 +53,11 @@ def train(config_yaml_path: Path, output_dir: Path):
     train_loader = _create_loader(datasets["train"], for_train=True, for_eval=False)
     test_loader = _create_loader(datasets["test"], for_train=False, for_eval=False)
     eval_loader = _create_loader(datasets["eval"], for_train=False, for_eval=True)
-    valid_loader = _create_loader(datasets["valid"], for_train=False, for_eval=True) if datasets["valid"] is not None else None
+    valid_loader = (
+        _create_loader(datasets["valid"], for_train=False, for_eval=True)
+        if datasets["valid"] is not None
+        else None
+    )
 
     # predictor
     predictor = create_predictor(config.network)
@@ -74,7 +79,7 @@ def train(config_yaml_path: Path, output_dir: Path):
 
     # evaluator
     generator = Generator(
-        config=config, predictor=predictor_scripted, use_gpu=config.train.use_gpu
+        config=config, predictor=predictor, use_gpu=config.train.use_gpu
     )
     evaluator = Evaluator(generator=generator)
 
@@ -165,7 +170,7 @@ def train(config_yaml_path: Path, output_dir: Path):
         if epoch % config.train.log_epoch == 0:
             model.eval()
 
-            with torch.inference_mode():
+            with torch.no_grad():
                 test_results: list[ModelOutput] = []
                 for batch in test_loader:
                     batch = to_device(batch, device, non_blocking=True)

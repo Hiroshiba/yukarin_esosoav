@@ -87,7 +87,7 @@ class FeatureTargetDataset(Dataset):
         return default_convert(preprocess(data))
 
 
-def create_dataset(config: DatasetConfig):
+def create_dataset(config: DatasetConfig) -> dict[str, Dataset | None]:
     """データセットを作成"""
     datas = get_datas(config.train_file)
 
@@ -96,7 +96,9 @@ def create_dataset(config: DatasetConfig):
 
     tests, trains = datas[: config.test_num], datas[config.test_num :]
 
-    def dataset_wrapper(datas, is_eval: bool):
+    def dataset_wrapper(
+        datas: Sequence[DatasetInput | LazyDatasetInput], is_eval: bool
+    ) -> Dataset:
         dataset = FeatureTargetDataset(datas=datas)
         if is_eval:
             dataset = ConcatDataset([dataset] * config.eval_times_num)

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Callable
+from typing import Any
 
 import numpy
 import torch
@@ -9,7 +10,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.optimizer import Optimizer
 
 
-def init_weights(model: torch.nn.Module, name: str):
+def init_weights(model: torch.nn.Module, name: str) -> None:
     def _init_weights(layer: nn.Module):
         initializer: Callable
         if name == "uniform":
@@ -41,7 +42,7 @@ def init_weights(model: torch.nn.Module, name: str):
     model.apply(_init_weights)
 
 
-def make_optimizer(config_dict: dict[str, Any], model: nn.Module):
+def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
@@ -83,7 +84,9 @@ class WarmupLR(_LRScheduler):
         ]
 
 
-def make_scheduler(config_dict: dict[str, Any], optimizer: Optimizer, last_epoch: int):
+def make_scheduler(
+    config_dict: dict[str, Any], optimizer: Optimizer, last_epoch: int
+) -> _LRScheduler:
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
@@ -98,7 +101,7 @@ def make_scheduler(config_dict: dict[str, Any], optimizer: Optimizer, last_epoch
     return scheduler
 
 
-def detach_cpu(data):
+def detach_cpu(data: Any) -> Any:
     elem_type = type(data)
     if isinstance(data, torch.Tensor):
         return data.detach().cpu()
@@ -118,7 +121,7 @@ def detach_cpu(data):
         return data
 
 
-def to_device(batch, device, non_blocking=False):
+def to_device(batch: Any, device: Any, non_blocking: bool = False) -> Any:
     if isinstance(batch, dict):
         return {
             key: to_device(value, device, non_blocking) for key, value in batch.items()
@@ -131,7 +134,7 @@ def to_device(batch, device, non_blocking=False):
         return batch
 
 
-def collate_list(batch):
+def collate_list(batch: list[Any]) -> dict[str, list[Any]]:
     if not batch:
         raise ValueError("batch is empty")
 
