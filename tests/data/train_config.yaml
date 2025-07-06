@@ -19,18 +19,18 @@ network:
 model: {}
 
 train:
-  batch_size: 20
-  eval_batch_size: 20
+  batch_size: 30
+  eval_batch_size: 30
   log_epoch: 1
   eval_epoch: 2
-  snapshot_epoch: 5
-  stop_epoch: 3
+  snapshot_epoch: 4
+  stop_epoch: 4
   model_save_num: 2
   optimizer:
     name: "adam"
     lr: 0.001
   scheduler: null
-  num_processes: 1
+  num_processes: 0
   use_gpu: false
   use_amp: false
 

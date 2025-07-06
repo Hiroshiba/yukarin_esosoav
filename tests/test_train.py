@@ -61,46 +61,22 @@ def test_paths(test_data_dir):
 @pytest.fixture(scope="session")
 def train_config(test_paths):
     """テスト用のPydantic設定オブジェクトを返す"""
-    config_dict = {
-        "dataset": {
-            "train_file": {
-                "feature_pathlist_path": str(test_paths["train_feature_pathlist"]),
-                "target_pathlist_path": str(test_paths["train_target_pathlist"]),
-                "root_dir": str(test_paths["data_dir"]),
-            },
-            "valid_file": {
-                "feature_pathlist_path": str(test_paths["valid_feature_pathlist"]),
-                "target_pathlist_path": str(test_paths["valid_target_pathlist"]),
-                "root_dir": str(test_paths["data_dir"]),
-            },
-            "test_num": 100,
-            "eval_times_num": 1,
-            "seed": 42,
-        },
-        "network": {
-            "input_size": 16,
-            "hidden_size": 32,
-            "output_size": 3,
-        },
-        "model": {},
-        "train": {
-            "batch_size": 30,
-            "eval_batch_size": 30,
-            "log_epoch": 1,
-            "eval_epoch": 2,
-            "snapshot_epoch": 4,
-            "stop_epoch": 4,
-            "model_save_num": 2,
-            "optimizer": {"name": "adam", "lr": 0.001},
-            "scheduler": None,
-            "num_processes": 0,
-            "use_gpu": False,
-            "use_amp": False,
-        },
-        "project": {"name": "test_project", "category": "test"},
-    }
+    config_path = Path(__file__).parent / "data" / "train_config.yaml"
+    
+    with config_path.open() as f:
+        config_dict = yaml.safe_load(f)
+    
+    config = Config.from_dict(config_dict)
+    
+    # テスト用のパスに更新
+    config.dataset.train_file.feature_pathlist_path = test_paths["train_feature_pathlist"]
+    config.dataset.train_file.target_pathlist_path = test_paths["train_target_pathlist"]
+    config.dataset.train_file.root_dir = test_paths["data_dir"]
+    config.dataset.valid_file.feature_pathlist_path = test_paths["valid_feature_pathlist"]
+    config.dataset.valid_file.target_pathlist_path = test_paths["valid_target_pathlist"]
+    config.dataset.valid_file.root_dir = test_paths["data_dir"]
 
-    return Config.from_dict(config_dict)
+    return config
 
 
 def test_dataset_creation(train_config):
