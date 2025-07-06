@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 from typing import Any, Literal, Optional, Set, Tuple
 
@@ -77,6 +78,16 @@ class Logger:
     def load_state_dict(self, state_dict):
         self.wandb_id = state_dict["wandb_id"]
 
+    def close(self):
+        if self.tensorboard is not None:
+            self.tensorboard.flush()
+            self.tensorboard.close()
+            self.tensorboard = None
+
+        if self.wandb is not None:
+            self.wandb.finish()
+            self.wandb = None
+
 
 class SaveManager:
     def __init__(
@@ -97,7 +108,7 @@ class SaveManager:
         self.top_step_values: list[tuple[int, float]] = []
 
     def save(self, value: float, step: int, judge: Literal["min", "max"]):
-        if numpy.isnan(value):
+        if math.isnan(value):
             return
 
         delete_steps: set[int] = set()

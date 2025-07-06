@@ -138,89 +138,93 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
     assert config.train.eval_epoch % config.train.log_epoch == 0
     assert config.train.snapshot_epoch % config.train.eval_epoch == 0
 
-    for _ in range(config.train.stop_epoch):
-        epoch += 1
-        if epoch > config.train.stop_epoch:
-            break
+    try:
+        for _ in range(config.train.stop_epoch):
+            epoch += 1
+            if epoch > config.train.stop_epoch:
+                break
 
-        model.train()
+            model.train()
 
-        train_results: list[ModelOutput] = []
-        for batch in train_loader:
-            iteration += 1
+            train_results: list[ModelOutput] = []
+            for batch in train_loader:
+                iteration += 1
 
-            with autocast(device, enabled=config.train.use_amp):
-                batch = to_device(batch, device, non_blocking=True)
-                result: ModelOutput = model(batch)
-
-            loss = result["loss"]
-            if loss.isnan():
-                raise ValueError("loss is NaN")
-
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            if scheduler is not None:
-                scheduler.step()
-
-            train_results.append(detach_cpu(result))
-
-        if epoch % config.train.log_epoch == 0:
-            model.eval()
-
-            with torch.no_grad():
-                test_results: list[ModelOutput] = []
-                for batch in test_loader:
+                with autocast(device, enabled=config.train.use_amp):
                     batch = to_device(batch, device, non_blocking=True)
-                    result = model(batch)
-                    test_results.append(detach_cpu(result))
+                    result: ModelOutput = model(batch)
 
-                summary = {
-                    "train": reduce_result(train_results),
-                    "test": reduce_result(test_results),
-                    "iteration": iteration,
-                    "lr": optimizer.param_groups[0]["lr"],
-                }
+                loss = result["loss"]
+                if loss.isnan():
+                    raise ValueError("loss is NaN")
 
-                if epoch % config.train.eval_epoch == 0:
-                    eval_results: list[ModelOutput] = []
-                    for batch in eval_loader:
+                optimizer.zero_grad()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+
+                if scheduler is not None:
+                    scheduler.step()
+
+                train_results.append(detach_cpu(result))
+
+            if epoch % config.train.log_epoch == 0:
+                model.eval()
+
+                with torch.no_grad():
+                    test_results: list[ModelOutput] = []
+                    for batch in test_loader:
                         batch = to_device(batch, device, non_blocking=True)
-                        result = evaluator(batch)
-                        eval_results.append(detach_cpu(result))
-                    summary["eval"] = reduce_result(eval_results)
+                        result = model(batch)
+                        test_results.append(detach_cpu(result))
 
-                    if valid_loader is not None:
-                        valid_results: list[ModelOutput] = []
-                        for batch in valid_loader:
+                    summary = {
+                        "train": reduce_result(train_results),
+                        "test": reduce_result(test_results),
+                        "iteration": iteration,
+                        "lr": optimizer.param_groups[0]["lr"],
+                    }
+
+                    if epoch % config.train.eval_epoch == 0:
+                        eval_results: list[ModelOutput] = []
+                        for batch in eval_loader:
                             batch = to_device(batch, device, non_blocking=True)
                             result = evaluator(batch)
-                            valid_results.append(detach_cpu(result))
-                        summary["valid"] = reduce_result(valid_results)
+                            eval_results.append(detach_cpu(result))
+                        summary["eval"] = reduce_result(eval_results)
 
-                    if epoch % config.train.snapshot_epoch == 0:
-                        torch.save(
-                            {
-                                "model": model.state_dict(),
-                                "optimizer": optimizer.state_dict(),
-                                "scaler": scaler.state_dict(),
-                                "logger": logger.state_dict(),
-                                "iteration": iteration,
-                                "epoch": epoch,
-                            },
-                            snapshot_path,
-                        )
+                        if valid_loader is not None:
+                            valid_results: list[ModelOutput] = []
+                            for batch in valid_loader:
+                                batch = to_device(batch, device, non_blocking=True)
+                                result = evaluator(batch)
+                                valid_results.append(detach_cpu(result))
+                            summary["valid"] = reduce_result(valid_results)
 
-                        if "valid" in summary:
-                            save_manager.save(
-                                value=summary["valid"]["value"],
-                                step=epoch,
-                                judge=evaluator.judge,
+                        if epoch % config.train.snapshot_epoch == 0:
+                            torch.save(
+                                {
+                                    "model": model.state_dict(),
+                                    "optimizer": optimizer.state_dict(),
+                                    "scaler": scaler.state_dict(),
+                                    "logger": logger.state_dict(),
+                                    "iteration": iteration,
+                                    "epoch": epoch,
+                                },
+                                snapshot_path,
                             )
 
-                logger.log(summary=summary, step=epoch)
+                            if "valid" in summary:
+                                save_manager.save(
+                                    value=summary["valid"]["value"],
+                                    step=epoch,
+                                    judge=evaluator.judge,
+                                )
+
+                    logger.log(summary=summary, step=epoch)
+    finally:
+        # TODO: for文内のものを関数切り出しする？
+        logger.close()
 
 
 if __name__ == "__main__":
