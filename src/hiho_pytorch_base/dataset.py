@@ -72,7 +72,7 @@ def _load_pathlist(path: Path, root_dir: Path) -> dict[str, Path]:
 
 def get_datas(config: DatasetFileConfig) -> list[LazyDatasetInput]:
     """データを取得"""
-    # TODO: 過去の３つのプロジェクトに合わせてファイル数をassertするべき
+    # TODO: 過去の３つのプロジェクトに合わせ、ファイル数をassertするべき
 
     feature_vector_paths = _load_pathlist(config.feature_pathlist_path, config.root_dir / "feature_vector")
     fn_list = sorted(feature_vector_paths.keys())
@@ -133,12 +133,12 @@ def create_dataset(config: DatasetConfig) -> dict[str, Dataset | None]:
             dataset = ConcatDataset([dataset] * config.eval_times_num)
         return dataset
 
-    # バリデーションデータセット
     valid_dataset = None
     if config.valid_file is not None:
         valids = get_datas(config.valid_file)
         valid_dataset = dataset_wrapper(valids, is_eval=True)
 
+    # TODO: この出力もdataclassにする
     return {
         "train": dataset_wrapper(trains, is_eval=False),
         "test": dataset_wrapper(tests, is_eval=False),

@@ -64,7 +64,7 @@ def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
     return optimizer
 
 
-class WarmupLR(_LRScheduler):
+class WarmupLR(_LRScheduler):  # TODO: これバグってるんだったかも、既存のプロジェクトの実装を参考にして比べる
     def __init__(
         self,
         optimizer: Optimizer,
@@ -134,7 +134,7 @@ def to_device(batch: Any, device: Any, non_blocking: bool = False) -> Any:
         return batch
 
 
-def collate_list(batch: list[Any]) -> dict[str, list[Any]]:
+def collate_list(batch: list[Any]) -> dict[str, list[Any]]: # TODO: いらない
     if not batch:
         raise ValueError("batch is empty")
 
@@ -150,11 +150,11 @@ def collate_list(batch: list[Any]) -> dict[str, list[Any]]:
         raise ValueError(type(first_elem))
 
 
-def collate_dataclass(batch: list[Any]) -> Any:
+def collate_dataclass(batch: list[Any]) -> Any: # TODO: Anyではないはず
     if not batch:
         raise ValueError("batch is empty")
 
-    from hiho_pytorch_base.dataset import BatchOutput
+    from hiho_pytorch_base.dataset import BatchOutput  # TODO: utilityがこれを参照するのはおかしいのでdata.pyとかにbatch.pyだとかに移動する
 
     result_dict = {}
 
@@ -162,7 +162,7 @@ def collate_dataclass(batch: list[Any]) -> Any:
         values = [getattr(item, field_name) for item in batch]
 
         if field_type == list[torch.Tensor]:
-            result_dict[field_name] = values
+            result_dict[field_name] = values  # TODO: ここでpadする？datasetからmaskを受け取る形で
         elif field_type == torch.Tensor:
             result_dict[field_name] = torch.stack(values)
         else:

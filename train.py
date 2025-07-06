@@ -216,14 +216,16 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
 
                             if "valid" in summary:
                                 save_manager.save(
-                                    value=summary["valid"]["value"],
+                                    value=summary["valid"][
+                                        "value"
+                                    ],  # TODO: configで指定可能にする
                                     step=epoch,
                                     judge=evaluator.judge,
                                 )
 
                     logger.log(summary=summary, step=epoch)
     finally:
-        # TODO: for文内のものを関数切り出しする？
+        # TODO: for文内のものを関数切り出しする？というより学習に必要ないろんなインスタンスを１つのdataclassにまとめると良さそう
         logger.close()
 
 
