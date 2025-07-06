@@ -200,14 +200,25 @@ project:
     - valid_dataset None 対応処理追加
     - target データ型修正（.float() → .long()、cross_entropy用）
     - DatasetOutput/GeneratorOutput 型一貫性確保
+18. ✅ **インポートパス更新完了**: 全ファイルで`library` → `hiho_pytorch_base`への更新完了
+    - scripts/generate.py のインポートパス修正完了
+    - 残存していたlibraryインポートを全て修正
+19. ✅ **Pydantic設定システム移行**: dataclassからPydantic BaseModelへの移行完了
+    - pydantic>=2.11.7 依存関係追加
+    - 全configクラス（DatasetFileConfig、DatasetConfig、NetworkConfig等）をBaseModelに変更
+    - model_validate()、model_dump(mode="json")による適切なシリアライゼーション
+    - PathオブジェクトのYAML変換問題解決
+    - 全テスト通過確認
+20. ✅ **テストシステム復活**: train.pyベース実装に合わせたtest_train.py復活完了
+    - train.pyのtrain関数を直接テスト
+    - 実際の学習プロセス実行テスト（test_train_simple_epochs）
+    - TensorBoardログ、predictorモデル、snapshotファイル生成確認
+    - 全5テスト通過確認
 
 ## 今後の作業
 
-1. **インポートパス更新（残り）**: 残りのファイルで`library` → `hiho_pytorch_base`への更新が必要
-2. **Ruffコード修正**: docstring、unused imports等のエラー修正が必要
-3. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
-4. **テストシステム復活**: train.py ベース実装に合わせて test_train.py を復活させる
-5. **Pydantic設定システム**: dataclassの代わりにPydanticを使ってconfigファイルをロードする
+1. **Ruffコード修正**: docstring、unused imports等のエラー修正が必要
+2. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
 
 ## 開発ガイドライン
 

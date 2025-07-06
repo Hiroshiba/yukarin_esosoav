@@ -1,20 +1,18 @@
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
-from hiho_pytorch_base.utility import dataclass_utility
+from pydantic import BaseModel, Field
+
 from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
 
 
-@dataclass
-class DatasetFileConfig:
+class DatasetFileConfig(BaseModel):
     feature_pathlist_path: Path
     target_pathlist_path: Path
     root_dir: Path
 
 
-@dataclass
-class DatasetConfig:
+class DatasetConfig(BaseModel):
     train_file: DatasetFileConfig
     test_num: int
     valid_file: DatasetFileConfig | None = None
@@ -22,20 +20,17 @@ class DatasetConfig:
     seed: int = 0
 
 
-@dataclass
-class NetworkConfig:
+class NetworkConfig(BaseModel):
     input_size: int
     hidden_size: int
     output_size: int
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(BaseModel):
     pass
 
 
-@dataclass
-class TrainConfig:
+class TrainConfig(BaseModel):
     batch_size: int
     eval_batch_size: int
     log_epoch: int
@@ -52,15 +47,13 @@ class TrainConfig:
     use_amp: bool = True
 
 
-@dataclass
-class ProjectConfig:
+class ProjectConfig(BaseModel):
     name: str
-    tags: dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, Any] = Field(default_factory=dict)
     category: str | None = None
 
 
-@dataclass
-class Config:
+class Config(BaseModel):
     dataset: DatasetConfig
     network: NetworkConfig
     model: ModelConfig
@@ -68,12 +61,12 @@ class Config:
     project: ProjectConfig
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Config":
+    def from_dict(cls, d: dict[str, Any]) -> Self:
         backward_compatible(d)
-        return dataclass_utility.convert_from_dict(cls, d)
+        return cls.model_validate(d)
 
     def to_dict(self) -> dict[str, Any]:
-        return dataclass_utility.convert_to_dict(self)
+        return self.model_dump(mode="json")
 
     def add_git_info(self) -> None:
         self.project.tags["git-commit-id"] = get_commit_id()

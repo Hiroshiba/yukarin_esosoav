@@ -104,7 +104,6 @@ def create_pathlist_files(
     target_dir: Path,
     base_dir: Path,
     train_count: int = 100,
-    test_count: int = 100,
     valid_count: int = 100,
     seed: int = 42,
 ) -> dict[str, Path]:
@@ -116,7 +115,6 @@ def create_pathlist_files(
         target_dir: ターゲットファイルのディレクトリ
         base_dir: pathlistファイルを保存するディレクトリ
         train_count: 訓練データ数
-        test_count: テストデータ数
         valid_count: バリデーションデータ数
         seed: 乱数シード
 
@@ -131,7 +129,7 @@ def create_pathlist_files(
     target_files = sorted(target_dir.glob("*.npy"))
 
     total_files = len(feature_files)
-    total_needed = train_count + test_count + valid_count
+    total_needed = train_count + valid_count
 
     if total_files < total_needed:
         print(f"Warning: Only {total_files} files available, but {total_needed} needed")
@@ -142,17 +140,13 @@ def create_pathlist_files(
 
     # データを分割
     train_indices = indices[:train_count]
-    test_indices = indices[train_count : train_count + test_count]
-    valid_indices = indices[
-        train_count + test_count : train_count + test_count + valid_count
-    ]
+    valid_indices = indices[train_count : train_count + valid_count]
 
     # pathlistファイルを生成
     pathlist_files = {}
 
     for split_name, split_indices in [
         ("train", train_indices),
-        ("test", test_indices),
         ("valid", valid_indices),
     ]:
         if len(split_indices) == 0:
@@ -183,7 +177,6 @@ def ensure_test_data_exists(
     target_dir: Path,
     num_samples: int = 300,
     train_count: int = 100,
-    test_count: int = 100,
     valid_count: int = 100,
     **kwargs,
 ) -> bool:
@@ -216,7 +209,6 @@ def ensure_test_data_exists(
         target_dir=target_dir,
         base_dir=base_dir,
         train_count=train_count,
-        test_count=test_count,
         valid_count=valid_count,
         seed=kwargs.get("seed", 42),
     )
@@ -250,7 +242,6 @@ if __name__ == "__main__":
         target_dir=target_dir,
         base_dir=base_dir,
         train_count=100,
-        test_count=100,
         valid_count=100,
         seed=42,
     )
