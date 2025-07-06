@@ -9,7 +9,7 @@ from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.model import Model
 from hiho_pytorch_base.network.predictor import create_predictor
-from tests.generate_test_data import ensure_test_data_exists
+from tests.generate_test_data import create_pathlist_files, generate_multi_type_data
 from train import train
 
 
@@ -27,41 +27,34 @@ def test_data_dir():
 
 
 @pytest.fixture(scope="session")
-def test_feature_dir(test_data_dir):
-    """テスト用特徴量ディレクトリのパスを返す"""
-    return test_data_dir / "feature-npy"
-
-
-@pytest.fixture(scope="session")
-def test_target_dir(test_data_dir):
-    """テスト用ターゲットディレクトリのパスを返す"""
-    return test_data_dir / "target-npy"
-
-
-@pytest.fixture(scope="session")
-def test_paths(test_data_dir, test_feature_dir, test_target_dir):
+def test_paths(test_data_dir):
     """
-    テストデータセットパスを提供（train/validのみ）
+    新しいマルチタイプテストデータセットパスを提供
     """
-    ensure_test_data_exists(
-        feature_dir=test_feature_dir,
-        target_dir=test_target_dir,
+    # 新しいマルチタイプデータを生成
+    generate_multi_type_data(
+        data_dir=test_data_dir,
         num_samples=300,
-        train_count=200,
-        valid_count=100,
         feature_shape=(16,),
         num_classes=3,
         seed=42,
     )
 
+    # pathlistファイルを生成
+    pathlist_files = create_pathlist_files(
+        data_dir=test_data_dir,
+        base_dir=test_data_dir,
+        train_count=200,
+        valid_count=100,
+        seed=42,
+    )
+
     return {
         "data_dir": test_data_dir,
-        "feature_dir": test_feature_dir,
-        "target_dir": test_target_dir,
-        "train_feature_pathlist": test_data_dir / "train_feature_pathlist.txt",
-        "train_target_pathlist": test_data_dir / "train_target_pathlist.txt",
-        "valid_feature_pathlist": test_data_dir / "valid_feature_pathlist.txt",
-        "valid_target_pathlist": test_data_dir / "valid_target_pathlist.txt",
+        "train_feature_pathlist": pathlist_files["train"]["feature"],
+        "train_target_pathlist": pathlist_files["train"]["target"],
+        "valid_feature_pathlist": pathlist_files["valid"]["feature"],
+        "valid_target_pathlist": pathlist_files["valid"]["target"],
     }
 
 
@@ -73,12 +66,12 @@ def train_config(test_paths):
             "train_file": {
                 "feature_pathlist_path": str(test_paths["train_feature_pathlist"]),
                 "target_pathlist_path": str(test_paths["train_target_pathlist"]),
-                "root_dir": str(test_paths["feature_dir"].parent),
+                "root_dir": str(test_paths["data_dir"]),
             },
             "valid_file": {
                 "feature_pathlist_path": str(test_paths["valid_feature_pathlist"]),
                 "target_pathlist_path": str(test_paths["valid_target_pathlist"]),
-                "root_dir": str(test_paths["feature_dir"].parent),
+                "root_dir": str(test_paths["data_dir"]),
             },
             "test_num": 100,
             "eval_times_num": 1,
@@ -91,16 +84,16 @@ def train_config(test_paths):
         },
         "model": {},
         "train": {
-            "batch_size": 10,
-            "eval_batch_size": 10,
+            "batch_size": 30,
+            "eval_batch_size": 30,
             "log_epoch": 1,
             "eval_epoch": 2,
             "snapshot_epoch": 4,
-            "stop_epoch": 3,
+            "stop_epoch": 4,
             "model_save_num": 2,
             "optimizer": {"name": "adam", "lr": 0.001},
             "scheduler": None,
-            "num_processes": 1,
+            "num_processes": 0,
             "use_gpu": False,
             "use_amp": False,
         },
@@ -210,8 +203,8 @@ def test_data_loading(test_paths):
     assert len(train_features) == 200
     assert len(train_targets) == 200
 
-    # ファイルが実際に存在するか確認
+    # ファイルが実際に存在するか確認（新しいディレクトリ構造）
     data_dir = test_paths["data_dir"]
 
-    assert (data_dir / train_features[0]).exists()
-    assert (data_dir / train_targets[0]).exists()
+    assert (data_dir / "feature_vector" / train_features[0]).exists()
+    assert (data_dir / "target_vector" / train_targets[0]).exists()

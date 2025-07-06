@@ -6,11 +6,13 @@ from torch.nn.functional import cross_entropy
 from typing_extensions import TypedDict
 
 from hiho_pytorch_base.config import ModelConfig
-from hiho_pytorch_base.dataset import DatasetOutput
+from hiho_pytorch_base.dataset import BatchOutput
 
 
 class ModelOutput(TypedDict):
     loss: Tensor
+    loss_vector: Tensor
+    loss_scalar: Tensor
     accuracy: Tensor
     data_num: int
 
@@ -24,6 +26,7 @@ def reduce_result(results: list[ModelOutput]):
             result[key] = torch.stack(values).sum() / sum_data_num
         else:
             result[key] = sum(values) / sum_data_num
+    result["data_num"] = sum_data_num
     return result
 
 
@@ -40,16 +43,44 @@ class Model(nn.Module):
         self.model_config = model_config
         self.predictor = predictor
 
-    def forward(self, data: DatasetOutput) -> ModelOutput:
-        feature = torch.stack(data["feature"])
-        target = torch.stack(data["target"])
+        # 可変長データ処理用の線形層
+        self.variable_processor = nn.Linear(
+            32, predictor.input_size
+        )  # feature_variableの次元を合わせる
 
-        output = self.predictor(feature)
-        loss = cross_entropy(output, target)
-        acc = accuracy(output, target)
+        # スカラー出力用の追加ヘッド
+        self.scalar_head = nn.Linear(
+            predictor.hidden_size, 1
+        )  # hidden_sizeから1次元出力
+
+    def forward(self, data: BatchOutput) -> ModelOutput:
+        feature_vector = data.feature_vector
+        feature_variable = data.feature_variable
+        target_vector = data.target_vector
+        target_scalar = data.target_scalar
+
+        variable_means = []
+        for var_data in feature_variable:
+            var_mean = torch.mean(var_data, dim=0)
+            var_processed = self.variable_processor(var_mean)
+            variable_means.append(var_processed)
+
+        variable_features = torch.stack(variable_means)
+        combined_features = feature_vector + variable_features
+
+        vector_output = self.predictor(combined_features)
+        predictor_hidden = self.predictor.layers[:-1](combined_features)
+        scalar_output = self.scalar_head(predictor_hidden).squeeze(-1)
+
+        loss_vector = cross_entropy(vector_output, target_vector)
+        loss_scalar = nn.functional.mse_loss(scalar_output, target_scalar)
+        total_loss = loss_vector + loss_scalar
+        acc = accuracy(vector_output, target_vector)
 
         return ModelOutput(
-            loss=loss,
+            loss=total_loss,
+            loss_vector=loss_vector,
+            loss_scalar=loss_scalar,
             accuracy=acc,
-            data_num=feature.shape[0],
+            data_num=feature_vector.shape[0],
         )

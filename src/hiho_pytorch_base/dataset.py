@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
 
 import numpy
 import torch
@@ -14,34 +13,55 @@ from hiho_pytorch_base.config import DatasetConfig, DatasetFileConfig
 
 @dataclass
 class DatasetInput:
-    feature: numpy.ndarray
-    target: numpy.ndarray
+    feature_vector: numpy.ndarray
+    feature_variable: numpy.ndarray
+    target_vector: numpy.ndarray
+    target_scalar: float
 
 
 @dataclass
 class LazyDatasetInput:
-    feature_path: Path
-    target_path: Path
+    feature_vector_path: Path
+    feature_variable_path: Path
+    target_vector_path: Path
+    target_scalar_path: Path
 
     def generate(self):
         return DatasetInput(
-            feature=numpy.load(self.feature_path, allow_pickle=True),
-            target=numpy.load(self.target_path, allow_pickle=True),
+            feature_vector=numpy.load(self.feature_vector_path, allow_pickle=True),
+            feature_variable=numpy.load(self.feature_variable_path, allow_pickle=True),
+            target_vector=numpy.load(self.target_vector_path, allow_pickle=True),
+            target_scalar=float(numpy.load(self.target_scalar_path, allow_pickle=True)),
         )
 
 
-class DatasetOutput(TypedDict):
-    feature: Tensor
-    target: Tensor
+@dataclass
+class DatasetOutput:
+    feature_vector: Tensor
+    feature_variable: Tensor
+    target_vector: Tensor
+    target_scalar: Tensor
+
+
+@dataclass
+class BatchOutput:
+    feature_vector: Tensor
+    feature_variable: list[Tensor]
+    target_vector: Tensor
+    target_scalar: Tensor
 
 
 def preprocess(d: DatasetInput) -> DatasetOutput:
     """前処理関数"""
-    output_data = DatasetOutput(
-        feature=torch.from_numpy(d.feature).float(),
-        target=torch.from_numpy(d.target).long(),
+    variable_scalar = numpy.mean(d.feature_variable)
+    enhanced_feature = d.feature_vector + variable_scalar
+    
+    return DatasetOutput(
+        feature_vector=torch.from_numpy(enhanced_feature).float(),
+        feature_variable=torch.from_numpy(d.feature_variable).float(),
+        target_vector=torch.from_numpy(d.target_vector).long(),
+        target_scalar=torch.tensor(d.target_scalar).float(),
     )
-    return output_data
 
 
 def _load_pathlist(path: Path, root_dir: Path) -> dict[str, Path]:
@@ -52,17 +72,26 @@ def _load_pathlist(path: Path, root_dir: Path) -> dict[str, Path]:
 
 def get_datas(config: DatasetFileConfig) -> list[LazyDatasetInput]:
     """データを取得"""
-    feature_paths = _load_pathlist(config.feature_pathlist_path, config.root_dir)
-    fn_list = sorted(feature_paths.keys())
+    # TODO: 過去の３つのプロジェクトに合わせてファイル数をassertするべき
+
+    feature_vector_paths = _load_pathlist(config.feature_pathlist_path, config.root_dir / "feature_vector")
+    fn_list = sorted(feature_vector_paths.keys())
     assert len(fn_list) > 0
 
-    target_paths = _load_pathlist(config.target_pathlist_path, config.root_dir)
-    assert set(fn_list) == set(target_paths.keys())
+    target_vector_paths = _load_pathlist(config.target_pathlist_path, config.root_dir / "target_vector")
+    
+    target_fn_list = sorted(target_vector_paths.keys())
+    assert set(fn_list) == set(target_fn_list), f"Feature files: {set(fn_list)}, Target files: {set(target_fn_list)}"
+    
+    feature_variable_paths = {fn: config.root_dir / "feature_variable" / f"{fn}.npy" for fn in fn_list}
+    target_scalar_paths = {fn: config.root_dir / "target_scalar" / f"{fn}.npy" for fn in fn_list}
 
     datas = [
         LazyDatasetInput(
-            feature_path=feature_paths[fn],
-            target_path=target_paths[fn],
+            feature_vector_path=feature_vector_paths[fn],
+            feature_variable_path=feature_variable_paths[fn],
+            target_vector_path=target_vector_paths[fn],
+            target_scalar_path=target_scalar_paths[fn],
         )
         for fn in fn_list
     ]

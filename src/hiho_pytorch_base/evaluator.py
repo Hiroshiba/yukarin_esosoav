@@ -3,7 +3,7 @@ from typing import Literal, TypedDict
 import torch
 from torch import Tensor, nn
 
-from hiho_pytorch_base.dataset import DatasetOutput
+from hiho_pytorch_base.dataset import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
 
 
@@ -21,9 +21,9 @@ class Evaluator(nn.Module):
         super().__init__()
         self.generator = generator
 
-    def forward(self, data: DatasetOutput) -> EvaluatorOutput:
-        feature = torch.stack(data["feature"])
-        target = torch.stack(data["target"])
+    def forward(self, data: BatchOutput) -> EvaluatorOutput:
+        feature = data.feature_vector
+        target = data.target_vector
 
         output_result: GeneratorOutput = self.generator(feature)
         output = output_result.output

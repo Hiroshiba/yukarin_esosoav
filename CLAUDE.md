@@ -28,13 +28,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/hiho_pytorch_base/dataset.py`: データセット処理
   - `DatasetInput`: feature/targetデータ構造
   - `LazyDatasetInput`: 遅延読み込み対応
-  - `DatasetOutput`: TypedDictによるアウトプット定義
+  - `DatasetOutput`: dataclassによるアウトプット定義（feature_vector, feature_variable, target_vector, target_scalar）
+  - `BatchOutput`: collate後のバッチデータ構造（可変長データはList[Tensor]）
   - `FeatureTargetDataset`: PyTorchデータセット実装
   - `preprocess()`: 前処理関数
   - `_load_pathlist()`: pathlistファイル読み込み
-  - `get_datas()`: データ取得関数
+  - `get_datas()`: データ取得関数（ステムベースのファイル管理）
   - `create_dataset()`: データセット作成（train/test/eval/valid対応）
-  - pathlistファイル方式でのファイル管理（yukarin_sosfd準拠）
+  - pathlistファイル方式でのファイル管理（参照プロジェクト準拠）
+  - **ディレクトリ構造**: データタイプ別ディレクトリ管理（feature_vector/, feature_variable/, target_vector/, target_scalar/）
 
 ### モデル・ネットワーク
 - `src/hiho_pytorch_base/model.py`: モデル定義
@@ -47,9 +49,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `scripts/generate.py`: 推論スクリプト
 
 ### テスト
-- `tests/generate_test_data.py`: テストデータ生成コード（10サンプルのfeature/target .npyファイル）
+- `tests/generate_test_data.py`: テストデータ生成コード（マルチタイプデータ対応・ディレクトリ構造対応）
+  - `generate_multi_type_data()`: 4タイプデータ生成（feature_vector、feature_variable、target_vector、target_scalar）
+  - `create_pathlist_files()`: pathlistファイル生成（ステムベース管理）
 - `tests/conftest.py`: pytest fixtures（テストデータ自動生成機能）
-- `tests/test_train.py`: 学習システムのテスト（現在はpytorch-trainer削除のため無効化）
+- `tests/test_train.py`: 学習システムの統合テスト（train.py直接実行・全5テスト実装済み）
 
 ## 主要なファイル
 
@@ -185,8 +189,9 @@ project:
     - evaluator.judge を使用した SaveManager 実装
 14. ✅ **utility モジュール実装**: 参照プロジェクト準拠で新規作成
     - utility/train_utility.py（Logger、SaveManager）
-    - utility/pytorch_utility.py（make_optimizer、make_scheduler、collate_list等）
+    - utility/pytorch_utility.py（make_optimizer、make_scheduler、collate_list、collate_dataclass等）
     - 新しいPyTorch API対応（torch.amp、WarmupLR等）
+    - dataclassベースのcollateシステム実装
 15. ✅ **config.py エポックベース移行**: iteration → epoch ベースに更新完了
     - TrainConfig を iteration ベースから epoch ベースに変更
     - model_save_num、scheduler、pretrained_predictor_path 等フィールド追加
@@ -214,6 +219,17 @@ project:
     - 実際の学習プロセス実行テスト（test_train_simple_epochs）
     - TensorBoardログ、predictorモデル、snapshotファイル生成確認
     - 全5テスト通過確認
+21. ✅ **dataclassベースcollateシステム実装**: TypedDictからdataclassへの移行完了
+    - DatasetOutput・BatchOutputをdataclass化（feature_vector、feature_variable、target_vector、target_scalar）
+    - 可変長データ対応（feature_variableをList[Tensor]として扱い）
+    - type annotation基づくcollate_dataclass関数実装
+    - マルチタスク学習対応（分類+回帰）のModel forward method実装
+22. ✅ **ディレクトリベースデータ管理への移行**: ステムベースファイル管理実装完了
+    - 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）パターン適用
+    - 7文字除去方式からステム（Path.stem）ベース対応付けに変更
+    - データタイプ別ディレクトリ構造（feature_vector/、feature_variable/、target_vector/、target_scalar/）
+    - テストデータ生成システムの簡略化（同一ファイル名で各ディレクトリに保存）
+    - pathlistファイル生成・テストコードの新構造対応
 
 ## 今後の作業
 
@@ -243,6 +259,6 @@ project:
 
 - NetworkConfigとModelConfigは現在プレースホルダーのため、実際のネットワーク・モデル設定が必要です
 - **学習システム**: pytorch-trainerは削除され、新しいtrain.pyでネイティブPyTorch学習ループが動作します
-- 一部のファイルで古いインポートパス（`from library.xxx`）がまだ残っている可能性があります
+- **データ構造**: dataclassベースのマルチタイプデータ（feature_vector, feature_variable, target_vector, target_scalar）を使用
+- **ディレクトリ構造**: データタイプ別ディレクトリに同一ファイル名（ステムベース）で保存する方式を採用
 - Ruffによるコードチェックでdocstring、unused imports等のエラーが残っている
-- tests/test_train.pyは現在無効化されています（train.pyベース実装への移行対応が必要）

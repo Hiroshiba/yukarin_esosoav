@@ -148,3 +148,24 @@ def collate_list(batch: list[Any]) -> dict[str, list[Any]]:
 
     else:
         raise ValueError(type(first_elem))
+
+
+def collate_dataclass(batch: list[Any]) -> Any:
+    if not batch:
+        raise ValueError("batch is empty")
+
+    from hiho_pytorch_base.dataset import BatchOutput
+
+    result_dict = {}
+
+    for field_name, field_type in BatchOutput.__annotations__.items():
+        values = [getattr(item, field_name) for item in batch]
+
+        if field_type == list[torch.Tensor]:
+            result_dict[field_name] = values
+        elif field_type == torch.Tensor:
+            result_dict[field_name] = torch.stack(values)
+        else:
+            raise ValueError(f"Unsupported type annotation: {field_type}")
+
+    return BatchOutput(**result_dict)

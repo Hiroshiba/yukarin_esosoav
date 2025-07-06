@@ -15,7 +15,7 @@ from hiho_pytorch_base.generator import Generator
 from hiho_pytorch_base.model import Model, ModelOutput, reduce_result
 from hiho_pytorch_base.network.predictor import create_predictor
 from hiho_pytorch_base.utility.pytorch_utility import (
-    collate_list,
+    collate_dataclass,
     detach_cpu,
     init_weights,
     make_optimizer,
@@ -42,7 +42,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
             batch_size=batch_size,
             shuffle=True,
             num_workers=config.train.num_processes,
-            collate_fn=collate_list,
+            collate_fn=collate_dataclass,
             pin_memory=config.train.use_gpu,
             drop_last=for_train,
             timeout=0 if config.train.num_processes == 0 else 30,
@@ -98,8 +98,8 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
     # snapshot
     snapshot_path = output_dir / "snapshot.pth"
     if not snapshot_path.exists():
-        iteration = -1
-        epoch = -1
+        iteration = 0
+        epoch = 0
     else:
         snapshot = torch.load(snapshot_path, map_location=device)
 
