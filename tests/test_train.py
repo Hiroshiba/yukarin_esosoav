@@ -174,9 +174,14 @@ def test_config_loading(train_config):
         # 設定が正しく読み込まれたかチェック
         assert config.train.batch_size == train_config.train.batch_size
         assert config.train.stop_epoch == train_config.train.stop_epoch
-        assert config.network.input_size == train_config.network.input_size
+        assert (
+            config.network.feature_vector_size
+            == train_config.network.feature_vector_size
+        )
         assert config.network.hidden_size == train_config.network.hidden_size
-        assert config.network.output_size == train_config.network.output_size
+        assert (
+            config.network.target_vector_size == train_config.network.target_vector_size
+        )
 
     finally:
         config_path.unlink()

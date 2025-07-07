@@ -9,10 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 主なコンポーネント
 
 ### 設定管理
-- `src/hiho_pytorch_base/config.py`: データクラスベースの設定管理
-  - `DatasetFileConfig`: ファイルパス設定（feature_pathlist_path、target_pathlist_path、root_dir）
+- `src/hiho_pytorch_base/config.py`: Pydantic BaseModelベースの設定管理
+  - `DatasetFileConfig`: ファイルパス設定（feature_vector_pathlist_path、feature_variable_pathlist_path、target_vector_pathlist_path、target_scalar_pathlist_path、root_dir）
   - `DatasetConfig`: データセット設定（train_file、valid_file、test_num等）
-  - `NetworkConfig`: ネットワーク設定（実装は空のプレースホルダー）
+  - `NetworkConfig`: ネットワーク設定（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
   - `ModelConfig`: モデル設定（実装は空のプレースホルダー）
   - `TrainConfig`: 学習設定（batch_size、optimizer、use_gpu等）
   - `ProjectConfig`: プロジェクト設定（name、tags、category）
@@ -39,10 +39,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - **ディレクトリ構造**: データタイプ別ディレクトリ管理（feature_vector/, feature_variable/, target_vector/, target_scalar/）
 
 ### モデル・ネットワーク
-- `src/hiho_pytorch_base/model.py`: モデル定義
-  - `Model`: メインモデルクラス（cross_entropy loss、accuracy計算）
-  - `Networks`: ネットワークコンポーネント管理
-- `src/hiho_pytorch_base/network/predictor.py`: 予測器の実装
+- `src/hiho_pytorch_base/model.py`: マルチタスク学習対応のモデル定義
+  - `Model`: メインモデルクラス（分類・回帰両方の損失計算、accuracy計算）
+  - `ModelOutput`: dataclassによる出力定義（loss、loss_vector、loss_scalar、accuracy、data_num）
+- `src/hiho_pytorch_base/network/predictor.py`: マルチタスク学習対応の予測器実装
+  - `Predictor`: 固定長・可変長データ両方を処理し、ベクトル出力・スカラー出力を生成
+  - 可変長データ処理（variable_processor）とマルチヘッド出力（vector_head、scalar_head）
+  - `create_predictor()`: NetworkConfigから予測器を作成
 
 ### 推論・生成
 - `src/hiho_pytorch_base/generator.py`: 学習済みモデルからの推論
@@ -88,19 +91,27 @@ uv run ruff format
 YAML形式で設定を管理：
 ```yaml
 dataset:
-  train_file:
-    feature_pathlist_path: "/path/to/feature_pathlist.txt"
-    target_pathlist_path: "/path/to/target_pathlist.txt"
+  train:
+    feature_vector_pathlist_path: "/path/to/feature_vector_pathlist.txt"
+    feature_variable_pathlist_path: "/path/to/feature_variable_pathlist.txt"
+    target_vector_pathlist_path: "/path/to/target_vector_pathlist.txt"
+    target_scalar_pathlist_path: "/path/to/target_scalar_pathlist.txt"
     root_dir: "/path/to/data"
-  valid_file:  # optional
-    feature_pathlist_path: "/path/to/valid_feature_pathlist.txt"
-    target_pathlist_path: "/path/to/valid_target_pathlist.txt"
+  valid:  # optional
+    feature_vector_pathlist_path: "/path/to/valid/feature_vector_pathlist.txt"
+    feature_variable_pathlist_path: "/path/to/valid/feature_variable_pathlist.txt"
+    target_vector_pathlist_path: "/path/to/valid/target_vector_pathlist.txt"
+    target_scalar_pathlist_path: "/path/to/valid/target_scalar_pathlist.txt"
     root_dir: "/path/to/valid_data"
   test_num: 100
   eval_times_num: 1
   seed: 0
 
-network: {}
+network:
+  feature_vector_size: 128    # 固定長特徴ベクトルのサイズ
+  feature_variable_size: 64   # 可変長特徴の次元数
+  hidden_size: 256            # 隠れ層のサイズ
+  target_vector_size: 10      # 分類クラス数（ベクトル出力サイズ）
 
 model: {}
 
@@ -230,6 +241,12 @@ project:
     - データタイプ別ディレクトリ構造（feature_vector/、feature_variable/、target_vector/、target_scalar/）
     - テストデータ生成システムの簡略化（同一ファイル名で各ディレクトリに保存）
     - pathlistファイル生成・テストコードの新構造対応
+23. ✅ **NetworkConfigリファクタリング**: パラメーター名の分かりやすさとコード整理完了
+    - パラメーター名変更（input_size→feature_vector_size、variable_feature_size→feature_variable_size、vector_output_size→target_vector_size）
+    - 使われていないoutput_sizeパラメーターを削除
+    - Predictorクラスから不要なプロパティ保存を削除（ネットワーク構築にのみ使用）
+    - 引数順序を論理的に整理（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
+    - 関連ファイル（create_predictor関数、test_train.py、設定ファイル）の追従完了
 
 ## 今後の作業
 
@@ -253,11 +270,20 @@ project:
   - 複雑な型は`typing.Any`を使用
   - 例: `def function(param: str, data: dict[str, Any]) -> None:`
 - **互換性不要**: このプロジェクトは基準となるフレームワークのため、レガシー互換性コードは書かない
-- **デフォルト値禁止**: network/predictor.py等のコアコンポーネントでは引数にデフォルト値を設定しない（特にPredictorクラス）
+- **デフォルト値禁止**: 原則として関数・メソッドの引数にデフォルト値を設定しない
+  - デフォルト値はメンテナンス性を下げ、意図しない動作の原因となる
+  - 特にnetwork/predictor.py等のコアコンポーネントでは厳格に禁止（Predictorクラスのforwardメソッドなど）
+  - 一時的な迂回や問題回避のためのデフォルト値追加は絶対に禁止
+  - 例外的に許可される場合：
+    - 公開ライブラリのユーザー向けAPI
+    - 十分に設計・検討されたシグネチャー（レビューが必要）
+  - 内部実装では全ての引数を明示的に渡すこと
+  - 適切な設計を行ってから実装すること（デフォルト値で迂回しない）
 
 ## 注意事項
 
-- NetworkConfigとModelConfigは現在プレースホルダーのため、実際のネットワーク・モデル設定が必要です
+- **NetworkConfig**: マルチタスク学習対応で実装済み（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
+- **ModelConfig**: 現在プレースホルダーのため、実際のモデル設定が必要です
 - **学習システム**: pytorch-trainerは削除され、新しいtrain.pyでネイティブPyTorch学習ループが動作します
 - **データ構造**: dataclassベースのマルチタイプデータ（feature_vector, feature_variable, target_vector, target_scalar）を使用
 - **ディレクトリ構造**: データタイプ別ディレクトリに同一ファイル名（ステムベース）で保存する方式を採用

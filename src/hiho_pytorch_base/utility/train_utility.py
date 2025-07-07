@@ -1,15 +1,16 @@
 """学習用ユーティリティ関数群"""
 
 import math
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Any, Literal, Protocol, TypeVar
+from typing import Any, Literal, TypeVar
 
 import torch
 
 
-class DataNumProtocol(Protocol):
-    """data_numフィールドを持つdataclassのプロトコル"""
+@dataclass
+class DataNumProtocol:
+    """data_numフィールドを持つdataclass"""
 
     data_num: int
 

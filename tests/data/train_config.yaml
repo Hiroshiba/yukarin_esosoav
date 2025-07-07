@@ -16,9 +16,10 @@ dataset:
   seed: 42
 
 network:
-  input_size: 16
+  feature_vector_size: 16
+  feature_variable_size: 32
   hidden_size: 32
-  output_size: 3
+  target_vector_size: 3
 
 model: {}
 

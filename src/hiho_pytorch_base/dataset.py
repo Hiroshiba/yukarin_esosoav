@@ -18,10 +18,10 @@ from hiho_pytorch_base.config import DatasetConfig, DatasetFileConfig
 class DatasetInput:
     """データセットの入力データ構造"""
 
-    feature_vector: numpy.ndarray
-    feature_variable: numpy.ndarray
-    target_vector: numpy.ndarray
-    target_scalar: float
+    feature_vector: numpy.ndarray  # 固定長入力ダミーデータ
+    feature_variable: numpy.ndarray  # 可変長入力ダミーデータ
+    target_vector: numpy.ndarray  # 固定長目標ダミーデータ
+    target_scalar: float  # スカラー目標ダミーデータ
 
 
 @dataclass

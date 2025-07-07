@@ -4,24 +4,27 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
-from torch.nn.functional import cross_entropy
+from torch.nn.functional import cross_entropy, mse_loss
 
 from hiho_pytorch_base.config import ModelConfig
 from hiho_pytorch_base.dataset import BatchOutput
+from hiho_pytorch_base.network.predictor import Predictor
+from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 
 @dataclass
-class ModelOutput:
-    """モデル出力の型定義"""
+class ModelOutput(DataNumProtocol):
+    """学習時のモデルの出力。Lossと、イテレーション毎に計算したい値を含む"""
 
     loss: Tensor
+    """逆伝播させる損失"""
+
     loss_vector: Tensor
     loss_scalar: Tensor
     accuracy: Tensor
-    data_num: int
 
 
-def accuracy(output: Tensor, target: Tensor):
+def accuracy(output: Tensor, target: Tensor) -> Tensor:
     """分類精度を計算"""
     with torch.no_grad():
         indexes = torch.argmax(output, dim=1)
@@ -30,45 +33,26 @@ def accuracy(output: Tensor, target: Tensor):
 
 
 class Model(nn.Module):
-    """マルチタスク学習対応のメインモデル"""
+    """学習用のモデルクラス"""
 
-    def __init__(self, model_config: ModelConfig, predictor: nn.Module):
+    def __init__(self, model_config: ModelConfig, predictor: Predictor):
         super().__init__()
         self.model_config = model_config
         self.predictor = predictor
 
-        # 可変長データ処理用の線形層
-        self.variable_processor = nn.Linear(
-            32, predictor.input_size
-        )  # feature_variableの次元を合わせる
-
-        # スカラー出力用の追加ヘッド
-        self.scalar_head = nn.Linear(
-            predictor.hidden_size, 1
-        )  # hidden_sizeから1次元出力
-
     def forward(self, data: BatchOutput) -> ModelOutput:
-        """順伝播で分類と回帰の両方を予測"""
-        feature_vector = data.feature_vector
-        feature_variable = data.feature_variable
+        """ネットワークに入力して損失などを計算する"""
+        batch_size = data.feature_vector.shape[0]
+
+        vector_output, scalar_output = self.predictor(
+            feature_vector=data.feature_vector, feature_variable=data.feature_variable
+        )
+
         target_vector = data.target_vector
         target_scalar = data.target_scalar
 
-        variable_means = []
-        for var_data in feature_variable:
-            var_mean = torch.mean(var_data, dim=0)
-            var_processed = self.variable_processor(var_mean)
-            variable_means.append(var_processed)
-
-        variable_features = torch.stack(variable_means)
-        combined_features = feature_vector + variable_features
-
-        vector_output = self.predictor(combined_features)
-        predictor_hidden = self.predictor.layers[:-1](combined_features)
-        scalar_output = self.scalar_head(predictor_hidden).squeeze(-1)
-
         loss_vector = cross_entropy(vector_output, target_vector)
-        loss_scalar = nn.functional.mse_loss(scalar_output, target_scalar)
+        loss_scalar = mse_loss(scalar_output, target_scalar)
         total_loss = loss_vector + loss_scalar
         acc = accuracy(vector_output, target_vector)
 
@@ -77,5 +61,5 @@ class Model(nn.Module):
             loss_vector=loss_vector,
             loss_scalar=loss_scalar,
             accuracy=acc,
-            data_num=feature_vector.shape[0],
+            data_num=batch_size,
         )

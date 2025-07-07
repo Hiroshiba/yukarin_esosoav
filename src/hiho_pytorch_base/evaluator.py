@@ -7,20 +7,20 @@ from torch import Tensor, nn
 
 from hiho_pytorch_base.dataset import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
+from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 
 @dataclass
-class EvaluatorOutput:
-    """評価結果の出力型定義"""
+class EvaluatorOutput(DataNumProtocol):
+    """評価時の出力。特に含まないといけない値はない"""
 
     loss: Tensor
     accuracy: Tensor
-    data_num: int
 
 
-def calculate_value(evaluator_output: EvaluatorOutput) -> Tensor:
+def calculate_value(output: EvaluatorOutput) -> Tensor:
     """評価値を計算する関数。高いほど良い。"""
-    return evaluator_output.accuracy
+    return output.accuracy
 
 
 class Evaluator(nn.Module):
@@ -32,10 +32,13 @@ class Evaluator(nn.Module):
 
     def forward(self, data: BatchOutput) -> EvaluatorOutput:
         """バッチデータを用いて評価結果を返す"""
-        feature = data.feature_vector
+        feature_vector = data.feature_vector
+        feature_variable = data.feature_variable
         target = data.target_vector
 
-        output_result: GeneratorOutput = self.generator(feature)
+        output_result: GeneratorOutput = self.generator(
+            feature_vector, feature_variable
+        )
         output = output_result.output
 
         loss = torch.nn.functional.cross_entropy(output, target)
@@ -48,5 +51,5 @@ class Evaluator(nn.Module):
         return EvaluatorOutput(
             loss=loss,
             accuracy=accuracy,
-            data_num=feature.shape[0],
+            data_num=feature_vector.shape[0],
         )

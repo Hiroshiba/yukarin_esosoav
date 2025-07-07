@@ -31,9 +31,10 @@ class DatasetConfig(BaseModel):
 class NetworkConfig(BaseModel):
     """ニューラルネットワーク構造の設定"""
 
-    input_size: int
+    feature_vector_size: int
+    feature_variable_size: int
     hidden_size: int
-    output_size: int
+    target_vector_size: int
 
 
 class ModelConfig(BaseModel):
