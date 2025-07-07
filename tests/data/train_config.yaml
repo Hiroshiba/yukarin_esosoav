@@ -1,11 +1,15 @@
 dataset:
-  train_file:
-    feature_pathlist_path: "tests/data/test_data/train_feature_pathlist.txt"
-    target_pathlist_path: "tests/data/test_data/train_target_pathlist.txt"
+  train:
+    feature_vector_pathlist_path: "tests/data/test_data/train_feature_vector_pathlist.txt"
+    feature_variable_pathlist_path: "tests/data/test_data/train_feature_variable_pathlist.txt"
+    target_vector_pathlist_path: "tests/data/test_data/train_target_vector_pathlist.txt"
+    target_scalar_pathlist_path: "tests/data/test_data/train_target_scalar_pathlist.txt"
     root_dir: "tests/data/test_data"
-  valid_file:
-    feature_pathlist_path: "tests/data/test_data/valid_feature_pathlist.txt"
-    target_pathlist_path: "tests/data/test_data/valid_target_pathlist.txt"
+  valid:
+    feature_vector_pathlist_path: "tests/data/test_data/valid_feature_vector_pathlist.txt"
+    feature_variable_pathlist_path: "tests/data/test_data/valid_feature_variable_pathlist.txt"
+    target_vector_pathlist_path: "tests/data/test_data/valid_target_vector_pathlist.txt"
+    target_scalar_pathlist_path: "tests/data/test_data/valid_target_scalar_pathlist.txt"
     root_dir: "tests/data/test_data"
   test_num: 100
   eval_times_num: 1

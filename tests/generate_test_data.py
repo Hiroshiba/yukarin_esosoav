@@ -1,3 +1,4 @@
+"""テストデータ生成モジュール"""
 from pathlib import Path
 
 import numpy as np
@@ -41,7 +42,7 @@ def generate_multi_type_data(
 
     # 各クラスに対応する基本パターンを生成
     class_patterns = []
-    for class_idx in range(num_classes):
+    for _class_idx in range(num_classes):
         pattern = np.random.randn(*feature_shape).astype(np.float32)
         pattern = pattern / np.linalg.norm(pattern)
         class_patterns.append(pattern)
@@ -64,7 +65,7 @@ def generate_multi_type_data(
         variable_length = np.random.randint(5, 20)  # 5-19の可変長
         feature_variable = np.random.randn(variable_length, 32).astype(np.float32)
 
-        # 3. target_vector: ベクトル形式のターゲット（従来のtarget）
+        # 3. target_vector: ベクトル形式のターゲット
         target_vector = target_class
 
         # 4. target_scalar: スカラー形式のターゲット（回帰値）
@@ -132,24 +133,27 @@ def create_pathlist_files(
         if len(split_indices) == 0:
             continue
 
-        feature_pathlist = base_dir / f"{split_name}_feature_pathlist.txt"
-        target_pathlist = base_dir / f"{split_name}_target_pathlist.txt"
+        feature_vector_pathlist = base_dir / f"{split_name}_feature_vector_pathlist.txt"
+        feature_variable_pathlist = base_dir / f"{split_name}_feature_variable_pathlist.txt"
+        target_vector_pathlist = base_dir / f"{split_name}_target_vector_pathlist.txt"
+        target_scalar_pathlist = base_dir / f"{split_name}_target_scalar_pathlist.txt"
 
         # pathlistファイルを作成（ファイル名のみを記録）
-        with open(feature_pathlist, "w") as f:
-            for idx in split_indices:
-                file_name = base_files[idx].name  # XXX.npy
-                f.write(f"{file_name}\n")
+        for pathlist_path in [
+            feature_vector_pathlist,
+            feature_variable_pathlist,
+            target_vector_pathlist,
+            target_scalar_pathlist,
+        ]:
+            with open(pathlist_path, "w") as f:
+                for idx in split_indices:
+                    file_name = base_files[idx].name  # XXX.npy
+                    f.write(f"{file_name}\n")
 
-        with open(target_pathlist, "w") as f:
-            for idx in split_indices:
-                file_name = base_files[idx].name  # XXX.npy
-                f.write(f"{file_name}\n")
-
-        pathlist_files[split_name] = {
-            "feature": feature_pathlist,
-            "target": target_pathlist,
-        }
+        pathlist_files[f"{split_name}_feature_vector_pathlist"] = feature_vector_pathlist
+        pathlist_files[f"{split_name}_feature_variable_pathlist"] = feature_variable_pathlist
+        pathlist_files[f"{split_name}_target_vector_pathlist"] = target_vector_pathlist
+        pathlist_files[f"{split_name}_target_scalar_pathlist"] = target_scalar_pathlist
 
     return pathlist_files
 

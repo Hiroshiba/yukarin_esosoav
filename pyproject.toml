@@ -46,7 +46,7 @@ unfixable = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["hiho_pytorch_base"]
-known-third-party = ["numpy", "torch", "pytorch_trainer"]
+known-third-party = ["numpy", "torch"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

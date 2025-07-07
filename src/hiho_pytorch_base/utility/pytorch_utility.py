@@ -1,3 +1,5 @@
+"""PyTorch関連ユーティリティ関数群"""
+
 from collections.abc import Callable
 from copy import deepcopy
 from typing import Any
@@ -11,6 +13,8 @@ from torch.optim.optimizer import Optimizer
 
 
 def init_weights(model: torch.nn.Module, name: str) -> None:
+    """指定された名前の初期化手法でモデルの重みを初期化"""
+
     def _init_weights(layer: nn.Module):
         initializer: Callable
         if name == "uniform":
@@ -36,13 +40,14 @@ def init_weights(model: torch.nn.Module, name: str) -> None:
             if "weight" in key:
                 try:
                     initializer(param)
-                except:
+                except Exception:
                     pass
 
     model.apply(_init_weights)
 
 
 def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
+    """設定からオプティマイザーを作成"""
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
@@ -64,7 +69,11 @@ def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
     return optimizer
 
 
-class WarmupLR(_LRScheduler):  # TODO: これバグってるんだったかも、既存のプロジェクトの実装を参考にして比べる
+class WarmupLR(
+    _LRScheduler
+):  # TODO: これバグってるんだったかも、既存のプロジェクトの実装を参考にして比べる
+    """ウォームアップ対応の学習率スケジューラー"""
+
     def __init__(
         self,
         optimizer: Optimizer,
@@ -75,6 +84,7 @@ class WarmupLR(_LRScheduler):  # TODO: これバグってるんだったかも�
         super().__init__(optimizer, last_epoch)
 
     def get_lr(self):
+        """ウォームアップを考慮した学習率を計算"""
         step_num = self.last_epoch + 1
         return [
             lr
@@ -87,6 +97,7 @@ class WarmupLR(_LRScheduler):  # TODO: これバグってるんだったかも�
 def make_scheduler(
     config_dict: dict[str, Any], optimizer: Optimizer, last_epoch: int
 ) -> _LRScheduler:
+    """設定からスケジューラーを作成"""
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
@@ -102,6 +113,7 @@ def make_scheduler(
 
 
 def detach_cpu(data: Any) -> Any:
+    """TensorをdetachしてCPUに移動、再帰的に処理"""
     elem_type = type(data)
     if isinstance(data, torch.Tensor):
         return data.detach().cpu()
@@ -112,7 +124,7 @@ def detach_cpu(data: Any) -> Any:
             return elem_type({key: detach_cpu(data[key]) for key in data})
         except TypeError:
             return {key: detach_cpu(data[key]) for key in data}
-    elif isinstance(data, (list, tuple)):
+    elif isinstance(data, list | tuple):
         try:
             return elem_type([detach_cpu(d) for d in data])
         except TypeError:
@@ -122,11 +134,12 @@ def detach_cpu(data: Any) -> Any:
 
 
 def to_device(batch: Any, device: Any, non_blocking: bool = False) -> Any:
+    """データを指定されたデバイスに移動、再帰的に処理"""
     if isinstance(batch, dict):
         return {
             key: to_device(value, device, non_blocking) for key, value in batch.items()
         }
-    elif isinstance(batch, (list, tuple)):
+    elif isinstance(batch, list | tuple):
         return type(batch)(to_device(value, device, non_blocking) for value in batch)
     elif isinstance(batch, torch.Tensor):
         return batch.to(device, non_blocking=non_blocking)
@@ -134,7 +147,8 @@ def to_device(batch: Any, device: Any, non_blocking: bool = False) -> Any:
         return batch
 
 
-def collate_list(batch: list[Any]) -> dict[str, list[Any]]: # TODO: いらない
+def collate_list(batch: list[Any]) -> dict[str, list[Any]]:  # TODO: いらない
+    """バッチデータを辞書形式にまとめる"""
     if not batch:
         raise ValueError("batch is empty")
 
@@ -150,11 +164,14 @@ def collate_list(batch: list[Any]) -> dict[str, list[Any]]: # TODO: いらない
         raise ValueError(type(first_elem))
 
 
-def collate_dataclass(batch: list[Any]) -> Any: # TODO: Anyではないはず
+def collate_dataclass(batch: list[Any]) -> Any:  # TODO: Anyではないはず
+    """dataclassのリストをバッチ形式に変換"""
     if not batch:
         raise ValueError("batch is empty")
 
-    from hiho_pytorch_base.dataset import BatchOutput  # TODO: utilityがこれを参照するのはおかしいのでdata.pyとかにbatch.pyだとかに移動する
+    from hiho_pytorch_base.dataset import (
+        BatchOutput,  # TODO: utilityがこれを参照するのはおかしいのでdata.pyとかにbatch.pyだとかに移動する
+    )
 
     result_dict = {}
 
@@ -162,7 +179,9 @@ def collate_dataclass(batch: list[Any]) -> Any: # TODO: Anyではないはず
         values = [getattr(item, field_name) for item in batch]
 
         if field_type == list[torch.Tensor]:
-            result_dict[field_name] = values  # TODO: ここでpadする？datasetからmaskを受け取る形で
+            result_dict[field_name] = (
+                values  # TODO: ここでpadする？datasetからmaskを受け取る形で
+            )
         elif field_type == torch.Tensor:
             result_dict[field_name] = torch.stack(values)
         else:

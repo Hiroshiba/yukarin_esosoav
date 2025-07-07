@@ -1,3 +1,5 @@
+"""モデル評価モジュール"""
+
 from typing import Literal, TypedDict
 
 import torch
@@ -8,6 +10,8 @@ from hiho_pytorch_base.generator import Generator, GeneratorOutput
 
 
 class EvaluatorOutput(TypedDict):
+    """評価結果の出力型定義"""
+
     value: Tensor
     loss: Tensor
     accuracy: Tensor
@@ -15,6 +19,8 @@ class EvaluatorOutput(TypedDict):
 
 
 class Evaluator(nn.Module):
+    """モデルの評価を行うクラス"""
+
     judge: Literal["min", "max"] = "min"
 
     def __init__(self, generator: Generator):
@@ -22,6 +28,7 @@ class Evaluator(nn.Module):
         self.generator = generator
 
     def forward(self, data: BatchOutput) -> EvaluatorOutput:
+        """バッチデータを用いて評価結果を返す"""
         feature = data.feature_vector
         target = data.target_vector
 

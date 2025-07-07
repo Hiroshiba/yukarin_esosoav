@@ -1,21 +1,25 @@
+"""学習済みモデルからの推論モジュール"""
+
 from pathlib import Path
-from typing import Any
 
 import numpy
 import torch
 from torch import Tensor, nn
 
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.network.predictor import Predictor, create_predictor
+from hiho_pytorch_base.network.predictor import create_predictor
 
 
 class GeneratorOutput:
+    """推論結果のデータ構造"""
+
     def __init__(self, output: Tensor):
         self.output = output
 
 
 def to_tensor(array):
-    if not isinstance(array, (Tensor, numpy.ndarray)):
+    """様々な形式のデータをTensorに変換"""
+    if not isinstance(array, Tensor | numpy.ndarray):
         array = numpy.asarray(array)
     if isinstance(array, numpy.ndarray):
         return torch.from_numpy(array)
@@ -24,6 +28,8 @@ def to_tensor(array):
 
 
 class Generator(nn.Module):
+    """学習済みモデルからの推論を行うジェネレーター"""
+
     def __init__(
         self,
         config: Config,
@@ -42,6 +48,7 @@ class Generator(nn.Module):
         self.predictor = predictor.eval().to(self.device)
 
     def forward(self, feature):
+        """推論モードでGeneratorOutputを返す"""
         feature = to_tensor(feature).to(self.device)
 
         with torch.inference_mode():
@@ -50,6 +57,7 @@ class Generator(nn.Module):
         return GeneratorOutput(output=output)
 
     def generate(self, feature):
+        """生成モードでnumpy配列を返す"""
         if isinstance(feature, numpy.ndarray):
             feature = torch.from_numpy(feature)
         feature = feature.to(self.device)

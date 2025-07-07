@@ -1,7 +1,8 @@
+"""学習済みモデルからの推論・生成スクリプト"""
+
 import argparse
 import re
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from tqdm import tqdm
@@ -38,6 +39,7 @@ def generate(
     output_dir: Path,
     use_gpu: bool,
 ):
+    """学習済みモデルを使用して推論を実行"""
     if model_config is None:
         model_config = model_dir / "config.yaml"
 

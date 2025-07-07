@@ -1,3 +1,5 @@
+"""機械学習モデルの学習メインスクリプト"""
+
 import argparse
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,7 @@ from hiho_pytorch_base.utility.train_utility import Logger, SaveManager
 
 
 def train(config_yaml_path: Path, output_dir: Path) -> None:
+    """設定ファイルに基づいて機械学習モデルの学習を実行"""
     # config
     with config_yaml_path.open() as f:
         config_dict = yaml.safe_load(f)

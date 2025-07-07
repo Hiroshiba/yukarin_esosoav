@@ -1,8 +1,8 @@
+"""学習用ユーティリティ関数群"""
 import math
 from pathlib import Path
-from typing import Any, Literal, Optional, Set, Tuple
+from typing import Any, Literal
 
-import numpy
 import torch
 
 
@@ -19,6 +19,8 @@ def _flatten_dict(dd, separator="/", prefix=""):
 
 
 class Logger:
+    """TensorBoardとW&Bを統合した学習ログシステム"""
+
     def __init__(
         self,
         config_dict: dict[str, Any],
@@ -56,6 +58,7 @@ class Logger:
         self.tensorboard = SummaryWriter(log_dir=self.output_dir)
 
     def log(self, summary: dict[str, Any], step: int):
+        """ログ情報をTensorBoardとW&Bに送信"""
         if self.wandb is None or self.tensorboard is None:
             self._initialize()
 
@@ -72,13 +75,16 @@ class Logger:
         print(f"Step: {step}, {flattern_summary}")
 
     def state_dict(self):
+        """ロガーの状態辞書を取得"""
         state_dict = {"wandb_id": self.wandb_id}
         return state_dict
 
     def load_state_dict(self, state_dict):
+        """ロガーの状態を復元"""
         self.wandb_id = state_dict["wandb_id"]
 
     def close(self):
+        """ロガーを閉じてリソースを開放"""
         if self.tensorboard is not None:
             self.tensorboard.flush()
             self.tensorboard.close()
@@ -90,6 +96,8 @@ class Logger:
 
 
 class SaveManager:
+    """モデルの保存を管理するクラス（最良モデルと最新モデルを保持）"""
+
     def __init__(
         self,
         predictor: torch.nn.Module,
@@ -108,6 +116,7 @@ class SaveManager:
         self.top_step_values: list[tuple[int, float]] = []
 
     def save(self, value: float, step: int, judge: Literal["min", "max"]):
+        """モデルを保存し、最良モデルと最新モデルを管理"""
         if math.isnan(value):
             return
 
@@ -152,6 +161,7 @@ class SaveManager:
                 delete_path.unlink()
 
     def state_dict(self):
+        """セーブマネージャーの状態辞書を取得"""
         state_dict = {
             "last_steps": self.last_steps,
             "top_step_values": self.top_step_values,
@@ -159,5 +169,6 @@ class SaveManager:
         return state_dict
 
     def load_state_dict(self, state_dict):
+        """セーブマネージャーの状態を復元"""
         self.last_steps = state_dict["last_steps"]
         self.top_step_values = state_dict["top_step_values"]
