@@ -1,4 +1,5 @@
 """設定クラスのテスト"""
+
 from pathlib import Path
 
 import pytest

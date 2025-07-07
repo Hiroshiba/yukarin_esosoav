@@ -1,17 +1,17 @@
 """モデル定義モジュール"""
 
-from typing import Any
+from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
 from torch.nn.functional import cross_entropy
-from typing_extensions import TypedDict
 
 from hiho_pytorch_base.config import ModelConfig
 from hiho_pytorch_base.dataset import BatchOutput
 
 
-class ModelOutput(TypedDict):
+@dataclass
+class ModelOutput:
     """モデル出力の型定義"""
 
     loss: Tensor
@@ -19,20 +19,6 @@ class ModelOutput(TypedDict):
     loss_scalar: Tensor
     accuracy: Tensor
     data_num: int
-
-
-def reduce_result(results: list[ModelOutput]):
-    """複数のModelOutput結果をデータ数で重み付けして統計"""
-    result: dict[str, Any] = {}
-    sum_data_num = sum([r["data_num"] for r in results])
-    for key in set(results[0].keys()) - {"data_num"}:
-        values = [r[key] * r["data_num"] for r in results]
-        if isinstance(values[0], Tensor):
-            result[key] = torch.stack(values).sum() / sum_data_num
-        else:
-            result[key] = sum(values) / sum_data_num
-    result["data_num"] = sum_data_num
-    return result
 
 
 def accuracy(output: Tensor, target: Tensor):

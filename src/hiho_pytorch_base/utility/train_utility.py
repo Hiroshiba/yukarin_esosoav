@@ -1,9 +1,45 @@
 """学習用ユーティリティ関数群"""
+
 import math
+from dataclasses import fields
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, TypeVar
 
 import torch
+
+
+class DataNumProtocol(Protocol):
+    """data_numフィールドを持つdataclassのプロトコル"""
+
+    data_num: int
+
+
+T = TypeVar("T", bound=DataNumProtocol)
+
+
+def reduce_result(results: list[T]) -> T:
+    """複数のdataclass結果をデータ数で重み付けして統計"""
+    if not results:
+        raise ValueError("results cannot be empty")
+
+    result_dict: dict[str, Any] = {}
+    sum_data_num = sum([r.data_num for r in results])
+
+    for field in fields(results[0]):
+        key = field.name
+        if key == "data_num":
+            continue
+
+        values = [getattr(r, key) * r.data_num for r in results]
+        if isinstance(values[0], torch.Tensor):
+            result_dict[key] = torch.stack(values).sum() / sum_data_num
+        else:
+            result_dict[key] = sum(values) / sum_data_num
+
+    result_dict["data_num"] = sum_data_num
+
+    result_class = type(results[0])
+    return result_class(**result_dict)
 
 
 def _flatten_dict(dd, separator="/", prefix=""):

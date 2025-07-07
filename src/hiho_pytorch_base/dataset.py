@@ -1,9 +1,9 @@
 """データセット処理モジュール"""
 
+import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-import random
 
 import numpy
 import torch
@@ -76,50 +76,55 @@ def preprocess(d: DatasetInput) -> DatasetOutput:
     )
 
 
-def _load_pathlist(pathlist_path: Path, root_dir: Path) -> dict[str, Path]:
-    """pathlistファイルを読み込み、stemをキー、パスを値とする辞書を返す"""
+PathMap = dict[str, Path]
+"""パスマップ。stemをキー、パスを値とする辞書型"""
+
+
+def _load_pathlist(pathlist_path: Path, root_dir: Path) -> PathMap:
+    """pathlistファイルを読み込みんでパスマップを返す。"""
     path_list = [root_dir / p for p in pathlist_path.read_text().splitlines()]
     return {p.stem: p for p in path_list}
 
 
-def get_data_paths(root_dir: Path, *pathlist_configs: tuple[str, Path]) -> tuple[list[str], dict[str, dict[str, Path]]]:
-    """複数のpathlistファイルからデータパスマッピングを作成し、ファイル数の整合性をチェックする
-    
-    Args:
-        root_dir: データファイルのルートディレクトリ
-        *pathlist_configs: (データタイプ名, pathlistファイルパス) のタプル
-        
-    Returns:
-        fn_list: ソート済みのstemリスト
-        path_mappings: データタイプ名 -> {stem: Path} の辞書
-    """
-    if not pathlist_configs:
+def get_data_paths(
+    root_dir: Path, *pathlist_configs: tuple[str, Path]
+) -> tuple[list[str], list[PathMap]]:
+    """複数のpathlistファイルからstemリストとパスマップを返す。整合性も確認する。"""
+    if len(pathlist_configs) == 0:
         raise ValueError("少なくとも1つのpathlist設定が必要です")
-    
-    path_mappings: dict[str, dict[str, Path]] = {}
-    
+
+    path_mappings: list[PathMap] = []
+
     # 最初のpathlistをベースにstemリストを作成
     first_data_type, first_pathlist_path = pathlist_configs[0]
     first_paths = _load_pathlist(first_pathlist_path, root_dir / first_data_type)
     fn_list = sorted(first_paths.keys())
     assert len(fn_list) > 0, f"ファイルが存在しません: {first_pathlist_path}"
-    
-    path_mappings[first_data_type] = first_paths
-    
+
+    path_mappings.append(first_paths)
+
     # 残りのpathlistが同じstemセットを持つかチェック
     for data_type, pathlist_path in pathlist_configs[1:]:
         paths = _load_pathlist(pathlist_path, root_dir / data_type)
         assert set(fn_list) == set(paths.keys()), (
             f"ファイルが一致しません: {data_type} (expected: {len(fn_list)}, got: {len(paths)})"
         )
-        path_mappings[data_type] = paths
-        
+        path_mappings.append(paths)
+
     return fn_list, path_mappings
 
 
 def get_datas(config: DatasetFileConfig) -> list[LazyDatasetInput]:
     """データを取得"""
-    fn_list, path_mappings = get_data_paths(
+    (
+        fn_list,
+        (
+            feature_vector_pathmappings,
+            feature_variable_pathmappings,
+            target_vector_pathmappings,
+            target_scalar_pathmappings,
+        ),
+    ) = get_data_paths(
         config.root_dir,
         ("feature_vector", config.feature_vector_pathlist_path),
         ("feature_variable", config.feature_variable_pathlist_path),
@@ -129,10 +134,10 @@ def get_datas(config: DatasetFileConfig) -> list[LazyDatasetInput]:
 
     datas = [
         LazyDatasetInput(
-            feature_vector_path=path_mappings["feature_vector"][fn],
-            feature_variable_path=path_mappings["feature_variable"][fn],
-            target_vector_path=path_mappings["target_vector"][fn],
-            target_scalar_path=path_mappings["target_scalar"][fn],
+            feature_vector_path=feature_vector_pathmappings[fn],
+            feature_variable_path=feature_variable_pathmappings[fn],
+            target_vector_path=target_vector_pathmappings[fn],
+            target_scalar_path=target_scalar_pathmappings[fn],
         )
         for fn in fn_list
     ]
@@ -161,7 +166,17 @@ class FeatureTargetDataset(Dataset):
         return default_convert(preprocess(data))
 
 
-def create_dataset(config: DatasetConfig) -> dict[str, Dataset | None]:
+@dataclass
+class DatasetCollection:
+    """データセットコレクション"""
+
+    train: Dataset
+    test: Dataset
+    eval: Dataset
+    valid: Dataset | None
+
+
+def create_dataset(config: DatasetConfig) -> DatasetCollection:
     """データセットを作成"""
     # TODO: accent_estimatorのようにHDF5に対応させ、docs/にドキュメントを書く
     datas = get_datas(config.train)
@@ -179,14 +194,13 @@ def create_dataset(config: DatasetConfig) -> dict[str, Dataset | None]:
             dataset = ConcatDataset([dataset] * config.eval_times_num)
         return dataset
 
-    # TODO: この出力もdataclassにする
-    return {
-        "train": dataset_wrapper(trains, is_eval=False),
-        "test": dataset_wrapper(tests, is_eval=False),
-        "eval": dataset_wrapper(tests, is_eval=True),
-        "valid": (
+    return DatasetCollection(
+        train=dataset_wrapper(trains, is_eval=False),
+        test=dataset_wrapper(tests, is_eval=False),
+        eval=dataset_wrapper(tests, is_eval=True),
+        valid=(
             dataset_wrapper(get_datas(config.valid), is_eval=True)
             if config.valid is not None
             else None
         ),
-    }
+    )

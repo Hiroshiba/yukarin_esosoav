@@ -1,4 +1,5 @@
 """テストデータ生成モジュール"""
+
 from pathlib import Path
 
 import numpy as np
@@ -134,7 +135,9 @@ def create_pathlist_files(
             continue
 
         feature_vector_pathlist = base_dir / f"{split_name}_feature_vector_pathlist.txt"
-        feature_variable_pathlist = base_dir / f"{split_name}_feature_variable_pathlist.txt"
+        feature_variable_pathlist = (
+            base_dir / f"{split_name}_feature_variable_pathlist.txt"
+        )
         target_vector_pathlist = base_dir / f"{split_name}_target_vector_pathlist.txt"
         target_scalar_pathlist = base_dir / f"{split_name}_target_scalar_pathlist.txt"
 
@@ -150,8 +153,12 @@ def create_pathlist_files(
                     file_name = base_files[idx].name  # XXX.npy
                     f.write(f"{file_name}\n")
 
-        pathlist_files[f"{split_name}_feature_vector_pathlist"] = feature_vector_pathlist
-        pathlist_files[f"{split_name}_feature_variable_pathlist"] = feature_variable_pathlist
+        pathlist_files[f"{split_name}_feature_vector_pathlist"] = (
+            feature_vector_pathlist
+        )
+        pathlist_files[f"{split_name}_feature_variable_pathlist"] = (
+            feature_variable_pathlist
+        )
         pathlist_files[f"{split_name}_target_vector_pathlist"] = target_vector_pathlist
         pathlist_files[f"{split_name}_target_scalar_pathlist"] = target_scalar_pathlist
 

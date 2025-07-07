@@ -1,6 +1,7 @@
 """機械学習モデルの学習メインスクリプト"""
 
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +13,13 @@ from torch.utils.data import DataLoader
 
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
-from hiho_pytorch_base.evaluator import Evaluator
+from hiho_pytorch_base.evaluator import (
+    Evaluator,
+    EvaluatorOutput,
+    calculate_value,
+)
 from hiho_pytorch_base.generator import Generator
-from hiho_pytorch_base.model import Model, ModelOutput, reduce_result
+from hiho_pytorch_base.model import Model, ModelOutput
 from hiho_pytorch_base.network.predictor import create_predictor
 from hiho_pytorch_base.utility.pytorch_utility import (
     collate_dataclass,
@@ -24,7 +29,7 @@ from hiho_pytorch_base.utility.pytorch_utility import (
     make_scheduler,
     to_device,
 )
-from hiho_pytorch_base.utility.train_utility import Logger, SaveManager
+from hiho_pytorch_base.utility.train_utility import Logger, SaveManager, reduce_result
 
 
 def train(config_yaml_path: Path, output_dir: Path) -> None:
@@ -53,12 +58,12 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
         )
 
     datasets = create_dataset(config.dataset)
-    train_loader = _create_loader(datasets["train"], for_train=True, for_eval=False)
-    test_loader = _create_loader(datasets["test"], for_train=False, for_eval=False)
-    eval_loader = _create_loader(datasets["eval"], for_train=False, for_eval=True)
+    train_loader = _create_loader(datasets.train, for_train=True, for_eval=False)
+    test_loader = _create_loader(datasets.test, for_train=False, for_eval=False)
+    eval_loader = _create_loader(datasets.eval, for_train=False, for_eval=True)
     valid_loader = (
-        _create_loader(datasets["valid"], for_train=False, for_eval=True)
-        if datasets["valid"] is not None
+        _create_loader(datasets.valid, for_train=False, for_eval=True)
+        if datasets.valid is not None
         else None
     )
 
@@ -157,7 +162,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
                     batch = to_device(batch, device, non_blocking=True)
                     result: ModelOutput = model(batch)
 
-                loss = result["loss"]
+                loss = result.loss
                 if loss.isnan():
                     raise ValueError("loss is NaN")
 
@@ -182,27 +187,27 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
                         test_results.append(detach_cpu(result))
 
                     summary = {
-                        "train": reduce_result(train_results),
-                        "test": reduce_result(test_results),
+                        "train": asdict(reduce_result(train_results)),
+                        "test": asdict(reduce_result(test_results)),
                         "iteration": iteration,
                         "lr": optimizer.param_groups[0]["lr"],
                     }
 
                     if epoch % config.train.eval_epoch == 0:
-                        eval_results: list[ModelOutput] = []
+                        eval_results: list[EvaluatorOutput] = []
                         for batch in eval_loader:
                             batch = to_device(batch, device, non_blocking=True)
                             result = evaluator(batch)
                             eval_results.append(detach_cpu(result))
-                        summary["eval"] = reduce_result(eval_results)
+                        summary["eval"] = asdict(reduce_result(eval_results))
 
                         if valid_loader is not None:
-                            valid_results: list[ModelOutput] = []
+                            valid_results: list[EvaluatorOutput] = []
                             for batch in valid_loader:
                                 batch = to_device(batch, device, non_blocking=True)
                                 result = evaluator(batch)
                                 valid_results.append(detach_cpu(result))
-                            summary["valid"] = reduce_result(valid_results)
+                            summary["valid"] = asdict(reduce_result(valid_results))
 
                         if epoch % config.train.snapshot_epoch == 0:
                             torch.save(
@@ -218,12 +223,12 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
                             )
 
                             if "valid" in summary:
+                                valid_result = reduce_result(valid_results)
+                                evaluation_value = calculate_value(valid_result)
                                 save_manager.save(
-                                    value=summary["valid"][
-                                        "value"
-                                    ],  # TODO: configで指定可能にする
+                                    value=evaluation_value.item(),
                                     step=epoch,
-                                    judge=evaluator.judge,
+                                    judge="max",
                                 )
 
                     logger.log(summary=summary, step=epoch)

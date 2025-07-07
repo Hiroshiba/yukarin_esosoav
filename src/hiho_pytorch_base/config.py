@@ -56,7 +56,7 @@ class TrainConfig(BaseModel):
     scheduler: dict[str, Any] | None = None
     weight_initializer: str | None = None
     pretrained_predictor_path: Path | None = None
-    num_processes: int = 4
+    num_processes: int = 0
     use_gpu: bool = True
     use_amp: bool = True
 

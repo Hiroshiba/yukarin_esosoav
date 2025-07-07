@@ -51,12 +51,20 @@ def test_paths(test_data_dir):
 
     return {
         "data_dir": test_data_dir,
-        "train_feature_vector_pathlist": pathlist_files["train_feature_vector_pathlist"],
-        "train_feature_variable_pathlist": pathlist_files["train_feature_variable_pathlist"],
+        "train_feature_vector_pathlist": pathlist_files[
+            "train_feature_vector_pathlist"
+        ],
+        "train_feature_variable_pathlist": pathlist_files[
+            "train_feature_variable_pathlist"
+        ],
         "train_target_vector_pathlist": pathlist_files["train_target_vector_pathlist"],
         "train_target_scalar_pathlist": pathlist_files["train_target_scalar_pathlist"],
-        "valid_feature_vector_pathlist": pathlist_files["valid_feature_vector_pathlist"],
-        "valid_feature_variable_pathlist": pathlist_files["valid_feature_variable_pathlist"],
+        "valid_feature_vector_pathlist": pathlist_files[
+            "valid_feature_vector_pathlist"
+        ],
+        "valid_feature_variable_pathlist": pathlist_files[
+            "valid_feature_variable_pathlist"
+        ],
         "valid_target_vector_pathlist": pathlist_files["valid_target_vector_pathlist"],
         "valid_target_scalar_pathlist": pathlist_files["valid_target_scalar_pathlist"],
     }
@@ -79,8 +87,12 @@ def train_config(test_paths):
     config.dataset.train.feature_variable_pathlist_path = test_paths[
         "train_feature_variable_pathlist"
     ]
-    config.dataset.train.target_vector_pathlist_path = test_paths["train_target_vector_pathlist"]
-    config.dataset.train.target_scalar_pathlist_path = test_paths["train_target_scalar_pathlist"]
+    config.dataset.train.target_vector_pathlist_path = test_paths[
+        "train_target_vector_pathlist"
+    ]
+    config.dataset.train.target_scalar_pathlist_path = test_paths[
+        "train_target_scalar_pathlist"
+    ]
     config.dataset.train.root_dir = test_paths["data_dir"]
     config.dataset.valid.feature_vector_pathlist_path = test_paths[
         "valid_feature_vector_pathlist"
@@ -88,8 +100,12 @@ def train_config(test_paths):
     config.dataset.valid.feature_variable_pathlist_path = test_paths[
         "valid_feature_variable_pathlist"
     ]
-    config.dataset.valid.target_vector_pathlist_path = test_paths["valid_target_vector_pathlist"]
-    config.dataset.valid.target_scalar_pathlist_path = test_paths["valid_target_scalar_pathlist"]
+    config.dataset.valid.target_vector_pathlist_path = test_paths[
+        "valid_target_vector_pathlist"
+    ]
+    config.dataset.valid.target_scalar_pathlist_path = test_paths[
+        "valid_target_scalar_pathlist"
+    ]
     config.dataset.valid.root_dir = test_paths["data_dir"]
 
     return config
@@ -100,13 +116,13 @@ def test_dataset_creation(train_config):
     # データセットを作成
     datasets = create_dataset(train_config.dataset)
 
-    assert "train" in datasets
-    assert "test" in datasets
-    assert "eval" in datasets
-    assert len(datasets["train"]) == 100
-    assert len(datasets["test"]) == 100
-    assert len(datasets["eval"]) == 100
-    assert len(datasets["valid"]) == 100
+    assert datasets.train is not None
+    assert datasets.test is not None
+    assert datasets.eval is not None
+    assert len(datasets.train) == 100
+    assert len(datasets.test) == 100
+    assert len(datasets.eval) == 100
+    assert len(datasets.valid) == 100
 
 
 def test_model_creation(train_config):
