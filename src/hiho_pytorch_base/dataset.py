@@ -62,6 +62,11 @@ class BatchOutput:
     target_vector: Tensor
     target_scalar: Tensor
 
+    @property
+    def data_num(self) -> int:
+        """バッチサイズ（データ数）を返す"""
+        return self.feature_vector.shape[0]
+
 
 def preprocess(d: DatasetInput) -> DatasetOutput:
     """前処理関数"""

@@ -30,11 +30,11 @@ class Evaluator(nn.Module):
         super().__init__()
         self.generator = generator
 
-    def forward(self, data: BatchOutput) -> EvaluatorOutput:
+    def forward(self, batch: BatchOutput) -> EvaluatorOutput:
         """バッチデータを用いて評価結果を返す"""
-        feature_vector = data.feature_vector
-        feature_variable = data.feature_variable
-        target = data.target_vector
+        feature_vector = batch.feature_vector
+        feature_variable = batch.feature_variable
+        target = batch.target_vector
 
         output_result: GeneratorOutput = self.generator(
             feature_vector, feature_variable
@@ -51,5 +51,5 @@ class Evaluator(nn.Module):
         return EvaluatorOutput(
             loss=loss,
             accuracy=accuracy,
-            data_num=feature_vector.shape[0],
+            data_num=batch.data_num,
         )

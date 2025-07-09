@@ -40,16 +40,14 @@ class Model(nn.Module):
         self.model_config = model_config
         self.predictor = predictor
 
-    def forward(self, data: BatchOutput) -> ModelOutput:
+    def forward(self, batch: BatchOutput) -> ModelOutput:
         """ネットワークに入力して損失などを計算する"""
-        batch_size = data.feature_vector.shape[0]
-
         vector_output, scalar_output = self.predictor(
-            feature_vector=data.feature_vector, feature_variable=data.feature_variable
+            feature_vector=batch.feature_vector, feature_variable=batch.feature_variable
         )
 
-        target_vector = data.target_vector
-        target_scalar = data.target_scalar
+        target_vector = batch.target_vector
+        target_scalar = batch.target_scalar
 
         loss_vector = cross_entropy(vector_output, target_vector)
         loss_scalar = mse_loss(scalar_output, target_scalar)
@@ -61,5 +59,5 @@ class Model(nn.Module):
             loss_vector=loss_vector,
             loss_scalar=loss_scalar,
             accuracy=acc,
-            data_num=batch_size,
+            data_num=batch.data_num,
         )
