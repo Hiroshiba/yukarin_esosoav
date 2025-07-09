@@ -1,5 +1,6 @@
 """学習済みモデルからの推論モジュール"""
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy
@@ -7,24 +8,28 @@ import torch
 from torch import Tensor, nn
 
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.network.predictor import create_predictor
+from hiho_pytorch_base.network.predictor import Predictor, create_predictor
 
 
+@dataclass
 class GeneratorOutput:
     """推論結果のデータ構造"""
 
-    def __init__(self, output: Tensor):
-        self.output = output
+    vector_output: Tensor
+    scalar_output: Tensor
 
 
-def to_tensor(array):
-    """様々な形式のデータをTensorに変換"""
+def to_tensor(array: Tensor | numpy.ndarray, device: torch.device) -> Tensor:
+    """データをTensorに変換する"""
     if not isinstance(array, Tensor | numpy.ndarray):
         array = numpy.asarray(array)
     if isinstance(array, numpy.ndarray):
-        return torch.from_numpy(array)
+        tensor = torch.from_numpy(array)
     else:
-        return array
+        tensor = array
+
+    tensor = tensor.to(device)
+    return tensor
 
 
 class Generator(nn.Module):
@@ -33,7 +38,7 @@ class Generator(nn.Module):
     def __init__(
         self,
         config: Config,
-        predictor,
+        predictor: Predictor | Path,
         use_gpu: bool,
     ):
         super().__init__()
@@ -47,32 +52,20 @@ class Generator(nn.Module):
             predictor.load_state_dict(state_dict)
         self.predictor = predictor.eval().to(self.device)
 
-    def forward(self, feature_vector, feature_variable):
+    def forward(
+        self,
+        feature_vector: Tensor | numpy.ndarray,
+        feature_variable_list: list[Tensor | numpy.ndarray],
+    ) -> GeneratorOutput:
         """推論モードでGeneratorOutputを返す"""
-        feature_vector = to_tensor(feature_vector).to(self.device)
-        feature_variable = [to_tensor(fv).to(self.device) for fv in feature_variable]
-
-        with torch.inference_mode():
-            vector_output, scalar_output = self.predictor(
-                feature_vector, feature_variable
-            )
-
-        return GeneratorOutput(output=vector_output)
-
-    def generate(self, feature_vector, feature_variable):
-        """生成モードでnumpy配列を返す"""
-        if isinstance(feature_vector, numpy.ndarray):
-            feature_vector = torch.from_numpy(feature_vector)
-        feature_vector = feature_vector.to(self.device)
-
-        feature_variable = [
-            torch.from_numpy(fv) if isinstance(fv, numpy.ndarray) else fv
-            for fv in feature_variable
+        feature_vector = to_tensor(feature_vector, self.device)
+        feature_variable_list = [
+            to_tensor(d, self.device) for d in feature_variable_list
         ]
-        feature_variable = [fv.to(self.device) for fv in feature_variable]
 
         with torch.inference_mode():
             vector_output, scalar_output = self.predictor(
-                feature_vector, feature_variable
+                feature_vector, feature_variable_list
             )
-        return vector_output.cpu().numpy()
+
+        return GeneratorOutput(vector_output=vector_output, scalar_output=scalar_output)

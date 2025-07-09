@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor, nn
 
-from hiho_pytorch_base.dataset import BatchOutput
+from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
 from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
@@ -33,13 +33,13 @@ class Evaluator(nn.Module):
     def forward(self, batch: BatchOutput) -> EvaluatorOutput:
         """バッチデータを用いて評価結果を返す"""
         feature_vector = batch.feature_vector
-        feature_variable = batch.feature_variable
+        feature_variable_list = batch.feature_variable_list
         target = batch.target_vector
 
         output_result: GeneratorOutput = self.generator(
-            feature_vector, feature_variable
+            feature_vector, feature_variable_list
         )
-        output = output_result.output
+        output = output_result.vector_output
 
         loss = torch.nn.functional.cross_entropy(output, target)
 

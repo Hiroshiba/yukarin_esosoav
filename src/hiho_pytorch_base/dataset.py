@@ -53,21 +53,6 @@ class DatasetOutput:
     target_scalar: Tensor
 
 
-@dataclass
-class BatchOutput:
-    """バッチ処理後のデータ構造"""
-
-    feature_vector: Tensor
-    feature_variable: list[Tensor]
-    target_vector: Tensor
-    target_scalar: Tensor
-
-    @property
-    def data_num(self) -> int:
-        """バッチサイズ（データ数）を返す"""
-        return self.feature_vector.shape[0]
-
-
 def preprocess(d: DatasetInput) -> DatasetOutput:
     """前処理関数"""
     variable_scalar = numpy.mean(d.feature_variable)

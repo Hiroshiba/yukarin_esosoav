@@ -58,10 +58,12 @@ def generate(
         use_gpu=use_gpu,
     )
 
-    dataset = create_dataset(config.dataset)["test"]
+    dataset = create_dataset(config.dataset).test
     for data in tqdm(dataset, desc="generate"):
-        target = data["target"]
-        output = generator.generate(data["feature"])
+        feature_vector = data.feature_vector
+        feature_variable = data.feature_variable
+        target = data.target_vector
+        output = generator.forward(feature_vector, [feature_variable])
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
+from hiho_pytorch_base.batch import collate_dataset_output
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.evaluator import (
@@ -22,7 +23,6 @@ from hiho_pytorch_base.generator import Generator
 from hiho_pytorch_base.model import Model, ModelOutput
 from hiho_pytorch_base.network.predictor import create_predictor
 from hiho_pytorch_base.utility.pytorch_utility import (
-    collate_dataclass,
     detach_cpu,
     init_weights,
     make_optimizer,
@@ -50,7 +50,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
             batch_size=batch_size,
             shuffle=True,
             num_workers=config.train.num_processes,
-            collate_fn=collate_dataclass,
+            collate_fn=collate_dataset_output,
             pin_memory=config.train.use_gpu,
             drop_last=for_train,
             timeout=0 if config.train.num_processes == 0 else 30,

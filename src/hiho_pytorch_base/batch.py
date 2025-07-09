@@ -1,0 +1,46 @@
+"""バッチ処理モジュール"""
+
+from dataclasses import dataclass
+
+import torch
+from torch import Tensor
+
+from hiho_pytorch_base.dataset import DatasetOutput
+
+
+@dataclass
+class BatchOutput:
+    """バッチ処理後のデータ構造"""
+
+    feature_vector: Tensor
+    feature_variable_list: list[Tensor]
+    target_vector: Tensor
+    target_scalar: Tensor
+
+    @property
+    def data_num(self) -> int:
+        """バッチサイズ（データ数）を返す"""
+        return self.feature_vector.shape[0]
+
+
+def collate_stack(values: list[Tensor]) -> Tensor:
+    """Tensorのリストをスタックする"""
+    return torch.stack(values)
+
+
+def collate_list(values: list[Tensor]) -> list[Tensor]:
+    """Tensorのリストをそのまま返す"""
+    return values  # TODO: ここでpadする？datasetからmaskを受け取る形で
+
+
+def collate_dataset_output(data_list: list[DatasetOutput]) -> BatchOutput:
+    """DatasetOutputのリストをBatchOutputに変換"""
+    if not data_list:
+        raise ValueError("batch is empty")
+
+    return BatchOutput(
+        feature_vector=collate_stack([d.feature_vector for d in data_list]),
+        feature_variable_list=collate_list([d.feature_variable for d in data_list]),
+        target_vector=collate_stack([d.target_vector for d in data_list]),
+        target_scalar=collate_stack([d.target_scalar for d in data_list]),
+    )

@@ -6,8 +6,8 @@ import torch
 from torch import Tensor, nn
 from torch.nn.functional import cross_entropy, mse_loss
 
+from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.config import ModelConfig
-from hiho_pytorch_base.dataset import BatchOutput
 from hiho_pytorch_base.network.predictor import Predictor
 from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
@@ -43,7 +43,8 @@ class Model(nn.Module):
     def forward(self, batch: BatchOutput) -> ModelOutput:
         """ネットワークに入力して損失などを計算する"""
         vector_output, scalar_output = self.predictor(
-            feature_vector=batch.feature_vector, feature_variable=batch.feature_variable
+            feature_vector=batch.feature_vector,
+            feature_variable_list=batch.feature_variable_list,
         )
 
         target_vector = batch.target_vector
