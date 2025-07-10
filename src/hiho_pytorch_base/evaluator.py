@@ -30,6 +30,7 @@ class Evaluator(nn.Module):
         super().__init__()
         self.generator = generator
 
+    @torch.no_grad()
     def forward(self, batch: BatchOutput) -> EvaluatorOutput:
         """バッチデータを用いて評価結果を返す"""
         feature_vector = batch.feature_vector
@@ -43,10 +44,9 @@ class Evaluator(nn.Module):
 
         loss = torch.nn.functional.cross_entropy(output, target)
 
-        with torch.no_grad():
-            indexes = torch.argmax(output, dim=1)
-            correct = torch.eq(indexes, target).view(-1)
-            accuracy = correct.float().mean()
+        indexes = torch.argmax(output, dim=1)
+        correct = torch.eq(indexes, target).view(-1)
+        accuracy = correct.float().mean()
 
         return EvaluatorOutput(
             loss=loss,

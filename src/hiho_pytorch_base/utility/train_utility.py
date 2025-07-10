@@ -18,8 +18,9 @@ class DataNumProtocol:
 T = TypeVar("T", bound=DataNumProtocol)
 
 
+@torch.no_grad()
 def reduce_result(results: list[T]) -> T:
-    """複数のdataclass結果をデータ数で重み付けして統計"""
+    """結果をデータ数で重み付けして統計"""
     if not results:
         raise ValueError("results cannot be empty")
 

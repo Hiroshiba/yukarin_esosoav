@@ -1,7 +1,7 @@
 """機械学習モデルの学習メインスクリプト"""
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +9,7 @@ import torch
 import yaml
 from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from hiho_pytorch_base.batch import collate_dataset_output
 from hiho_pytorch_base.config import Config
@@ -21,7 +21,7 @@ from hiho_pytorch_base.evaluator import (
 )
 from hiho_pytorch_base.generator import Generator
 from hiho_pytorch_base.model import Model, ModelOutput
-from hiho_pytorch_base.network.predictor import create_predictor
+from hiho_pytorch_base.network.predictor import Predictor, create_predictor
 from hiho_pytorch_base.utility.pytorch_utility import (
     detach_cpu,
     init_weights,
@@ -32,37 +32,100 @@ from hiho_pytorch_base.utility.pytorch_utility import (
 from hiho_pytorch_base.utility.train_utility import Logger, SaveManager, reduce_result
 
 
-def train(config_yaml_path: Path, output_dir: Path) -> None:
-    """設定ファイルに基づいて機械学習モデルの学習を実行"""
+@dataclass
+class TrainingResults:
+    """学習結果を格納するデータクラス"""
+
+    train: ModelOutput
+
+    def to_summary_dict(self) -> dict[str, Any]:
+        """ログ出力用の辞書を生成"""
+        return {"train": asdict(self.train)}
+
+
+@dataclass
+class EvaluationResults:
+    """評価結果を格納するデータクラス"""
+
+    test: ModelOutput
+    eval: EvaluatorOutput
+    valid: EvaluatorOutput | None
+
+    def to_summary_dict(self) -> dict[str, Any]:
+        """ログ出力用の辞書を生成"""
+        summary = {
+            "test": asdict(self.test),
+            "eval": asdict(self.eval),
+        }
+        if self.valid is not None:
+            summary["valid"] = asdict(self.valid)
+        return summary
+
+
+@dataclass
+class TrainingContext:
+    """学習に必要な全てのオブジェクトをまとめるデータクラス"""
+
+    config: Config
+    train_loader: DataLoader
+    test_loader: DataLoader
+    eval_loader: DataLoader
+    valid_loader: DataLoader | None
+    model: Model
+    evaluator: Evaluator
+    optimizer: torch.optim.Optimizer
+    scaler: GradScaler
+    logger: Logger
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None
+    save_manager: SaveManager
+    device: str
+    epoch: int
+    iteration: int
+    snapshot_path: Path
+
+
+def create_data_loader(
+    config: Config, dataset: Dataset, for_train: bool, for_eval: bool
+) -> DataLoader:
+    """DataLoaderを作成"""
+    batch_size = config.train.eval_batch_size if for_eval else config.train.batch_size
+    return DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=config.train.num_processes,
+        collate_fn=collate_dataset_output,
+        pin_memory=config.train.use_gpu,
+        drop_last=for_train,
+        timeout=0 if config.train.num_processes == 0 else 30,
+        persistent_workers=config.train.num_processes > 0,
+    )
+
+
+def setup_training_context(config_yaml_path: Path, output_dir: Path) -> TrainingContext:
+    """学習に必要な全てのオブジェクトを初期化してTrainingContextを作成"""
     # config
     with config_yaml_path.open() as f:
         config_dict = yaml.safe_load(f)
     config = Config.from_dict(config_dict)
     config.add_git_info()
+    config.validate_config()
 
     # dataset
-    def _create_loader(dataset: Any, for_train: bool, for_eval: bool) -> DataLoader:
-        batch_size = (
-            config.train.eval_batch_size if for_eval else config.train.batch_size
-        )
-        return DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=config.train.num_processes,
-            collate_fn=collate_dataset_output,
-            pin_memory=config.train.use_gpu,
-            drop_last=for_train,
-            timeout=0 if config.train.num_processes == 0 else 30,
-            persistent_workers=config.train.num_processes > 0,
-        )
-
     datasets = create_dataset(config.dataset)
-    train_loader = _create_loader(datasets.train, for_train=True, for_eval=False)
-    test_loader = _create_loader(datasets.test, for_train=False, for_eval=False)
-    eval_loader = _create_loader(datasets.eval, for_train=False, for_eval=True)
+
+    # data loader
+    train_loader = create_data_loader(
+        config, datasets.train, for_train=True, for_eval=False
+    )
+    test_loader = create_data_loader(
+        config, datasets.test, for_train=False, for_eval=False
+    )
+    eval_loader = create_data_loader(
+        config, datasets.eval, for_train=False, for_eval=True
+    )
     valid_loader = (
-        _create_loader(datasets.valid, for_train=False, for_eval=True)
+        create_data_loader(config, datasets.valid, for_train=False, for_eval=True)
         if datasets.valid is not None
         else None
     )
@@ -78,7 +141,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
     print("predictor:", predictor)
 
     # model
-    predictor_scripted = torch.jit.script(predictor)
+    predictor_scripted: Predictor = torch.jit.script(predictor)  # type: ignore
     model = Model(model_config=config.model, predictor=predictor_scripted)
     if config.train.weight_initializer is not None:
         init_weights(model, name=config.train.weight_initializer)
@@ -87,7 +150,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
 
     # evaluator
     generator = Generator(
-        config=config, predictor=predictor, use_gpu=config.train.use_gpu
+        config=config, predictor=predictor_scripted, use_gpu=config.train.use_gpu
     )
     evaluator = Evaluator(generator=generator)
 
@@ -103,30 +166,13 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
         output_dir=output_dir,
     )
 
-    # snapshot
-    snapshot_path = output_dir / "snapshot.pth"
-    if not snapshot_path.exists():
-        iteration = 0
-        epoch = 0
-    else:
-        snapshot = torch.load(snapshot_path, map_location=device)
-
-        model.load_state_dict(snapshot["model"])
-        optimizer.load_state_dict(snapshot["optimizer"])
-        scaler.load_state_dict(snapshot["scaler"])
-        logger.load_state_dict(snapshot["logger"])
-
-        iteration = snapshot["iteration"]
-        epoch = snapshot["epoch"]
-        print(f"Loaded snapshot from {snapshot_path} (epoch: {epoch})")
-
     # scheduler
     scheduler = None
     if config.train.scheduler is not None:
         scheduler = make_scheduler(
             config_dict=config.train.scheduler,
             optimizer=optimizer,
-            last_epoch=iteration,
+            last_epoch=0,
         )
 
     # save
@@ -138,103 +184,197 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
         last_num=config.train.model_save_num,
     )
 
+    return TrainingContext(
+        config=config,
+        train_loader=train_loader,
+        test_loader=test_loader,
+        eval_loader=eval_loader,
+        valid_loader=valid_loader,
+        model=model,
+        evaluator=evaluator,
+        optimizer=optimizer,
+        scaler=scaler,
+        logger=logger,
+        scheduler=scheduler,
+        save_manager=save_manager,
+        device=device,
+        epoch=0,
+        iteration=0,
+        snapshot_path=output_dir / "snapshot.pth",
+    )
+
+
+def load_snapshot(context: TrainingContext) -> None:
+    """スナップショットを読み込んで学習状態を復元"""
+    snapshot = torch.load(context.snapshot_path, map_location=context.device)
+
+    context.model.load_state_dict(snapshot["model"])
+    context.optimizer.load_state_dict(snapshot["optimizer"])
+    context.scaler.load_state_dict(snapshot["scaler"])
+    context.logger.load_state_dict(snapshot["logger"])
+
+    context.iteration = snapshot["iteration"]
+    context.epoch = snapshot["epoch"]
+
+    if context.scheduler is not None:
+        context.scheduler.last_epoch = context.iteration
+
+
+def train_one_epoch(context: TrainingContext) -> TrainingResults:
+    """1エポックのトレーニング処理"""
+    context.model.train()
+
+    train_results: list[ModelOutput] = []
+    for batch in context.train_loader:
+        context.iteration += 1
+
+        with autocast(context.device, enabled=context.config.train.use_amp):
+            batch = to_device(batch, context.device, non_blocking=True)
+            result: ModelOutput = context.model(batch)
+
+        loss = result.loss
+        if loss.isnan():
+            raise ValueError("loss is NaN")
+
+        context.optimizer.zero_grad()
+        context.scaler.scale(loss).backward()
+        context.scaler.step(context.optimizer)
+        context.scaler.update()
+
+        if context.scheduler is not None:
+            context.scheduler.step()
+
+        train_results.append(detach_cpu(result))
+
+    return TrainingResults(train=reduce_result(train_results))
+
+
+@torch.no_grad()
+def evaluate(context: TrainingContext) -> EvaluationResults:
+    """test/eval/validの評価"""
+    context.model.eval()
+
+    # test評価
+    test_result_list: list[ModelOutput] = []
+    for batch in context.test_loader:
+        batch = to_device(batch, context.device, non_blocking=True)
+        result = context.model(batch)
+        test_result_list.append(detach_cpu(result))
+    test_result = reduce_result(test_result_list)
+
+    # eval評価
+    eval_result_list: list[EvaluatorOutput] = []
+    for batch in context.eval_loader:
+        batch = to_device(batch, context.device, non_blocking=True)
+        result = context.evaluator(batch)
+        eval_result_list.append(detach_cpu(result))
+    eval_result = reduce_result(eval_result_list)
+
+    # valid評価
+    valid_result = None
+    if context.valid_loader is not None:
+        valid_result_list: list[EvaluatorOutput] = []
+        for batch in context.valid_loader:
+            batch = to_device(batch, context.device, non_blocking=True)
+            result = context.evaluator(batch)
+            valid_result_list.append(detach_cpu(result))
+        valid_result = reduce_result(valid_result_list)
+
+    return EvaluationResults(test=test_result, eval=eval_result, valid=valid_result)
+
+
+def save_predictor(
+    context: TrainingContext, evaluation_results: EvaluationResults
+) -> None:
+    """評価結果に基づいてpredictorを保存"""
+    if evaluation_results.valid is not None:
+        evaluation_value = calculate_value(evaluation_results.valid).item()
+    else:
+        evaluation_value = 0
+
+    context.save_manager.save(value=evaluation_value, step=context.epoch, judge="max")
+
+
+def save_checkpoint(context: TrainingContext) -> None:
+    """チェックポイント保存"""
+    torch.save(
+        {
+            "model": context.model.state_dict(),
+            "optimizer": context.optimizer.state_dict(),
+            "scaler": context.scaler.state_dict(),
+            "logger": context.logger.state_dict(),
+            "iteration": context.iteration,
+            "epoch": context.epoch,
+        },
+        context.snapshot_path,
+    )
+
+
+def should_log_epoch(context: TrainingContext) -> bool:
+    """ログ出力判定"""
+    return context.epoch % context.config.train.log_epoch == 0
+
+
+def should_eval_epoch(context: TrainingContext) -> bool:
+    """評価実行判定"""
+    return context.epoch % context.config.train.eval_epoch == 0
+
+
+def should_snapshot_epoch(context: TrainingContext) -> bool:
+    """スナップショット保存判定"""
+    return context.epoch % context.config.train.snapshot_epoch == 0
+
+
+def training_loop(context: TrainingContext) -> None:
+    """トレーニングループ"""
+    for _ in range(context.config.train.stop_epoch):
+        context.epoch += 1
+        if context.epoch > context.config.train.stop_epoch:
+            break
+
+        training_results = train_one_epoch(context)
+
+        if should_log_epoch(context):
+            summary: dict[str, Any] = training_results.to_summary_dict()
+
+            if should_eval_epoch(context):
+                evaluation_results = evaluate(context)
+
+                save_predictor(context, evaluation_results)
+
+                if should_snapshot_epoch(context):
+                    save_checkpoint(context)
+
+                summary.update(evaluation_results.to_summary_dict())
+
+            summary.update(
+                {
+                    "iteration": context.iteration,
+                    "lr": context.optimizer.param_groups[0]["lr"],
+                }
+            )
+
+            context.logger.log(summary=summary, step=context.epoch)
+
+
+def train(config_yaml_path: Path, output_dir: Path) -> None:
+    """設定ファイルに基づいて機械学習モデルをトレーニング"""
+    # 学習コンテキストの初期化
+    context = setup_training_context(config_yaml_path, output_dir)
+
+    # スナップショットの読み込み
+    if context.snapshot_path.exists():
+        load_snapshot(context)
+
+    # 設定ファイルの保存
     output_dir.mkdir(exist_ok=True, parents=True)
     with (output_dir / "config.yaml").open(mode="w") as f:
-        yaml.safe_dump(config.to_dict(), f)
-
-    # loop
-    assert config.train.eval_epoch % config.train.log_epoch == 0
-    assert config.train.snapshot_epoch % config.train.eval_epoch == 0
+        yaml.safe_dump(context.config.to_dict(), f)
 
     try:
-        for _ in range(config.train.stop_epoch):
-            epoch += 1
-            if epoch > config.train.stop_epoch:
-                break
-
-            model.train()
-
-            train_results: list[ModelOutput] = []
-            for batch in train_loader:
-                iteration += 1
-
-                with autocast(device, enabled=config.train.use_amp):
-                    batch = to_device(batch, device, non_blocking=True)
-                    result: ModelOutput = model(batch)
-
-                loss = result.loss
-                if loss.isnan():
-                    raise ValueError("loss is NaN")
-
-                optimizer.zero_grad()
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-
-                if scheduler is not None:
-                    scheduler.step()
-
-                train_results.append(detach_cpu(result))
-
-            if epoch % config.train.log_epoch == 0:
-                model.eval()
-
-                with torch.no_grad():
-                    test_results: list[ModelOutput] = []
-                    for batch in test_loader:
-                        batch = to_device(batch, device, non_blocking=True)
-                        result = model(batch)
-                        test_results.append(detach_cpu(result))
-
-                    summary = {
-                        "train": asdict(reduce_result(train_results)),
-                        "test": asdict(reduce_result(test_results)),
-                        "iteration": iteration,
-                        "lr": optimizer.param_groups[0]["lr"],
-                    }
-
-                    if epoch % config.train.eval_epoch == 0:
-                        eval_results: list[EvaluatorOutput] = []
-                        for batch in eval_loader:
-                            batch = to_device(batch, device, non_blocking=True)
-                            result = evaluator(batch)
-                            eval_results.append(detach_cpu(result))
-                        summary["eval"] = asdict(reduce_result(eval_results))
-
-                        if valid_loader is not None:
-                            valid_results: list[EvaluatorOutput] = []
-                            for batch in valid_loader:
-                                batch = to_device(batch, device, non_blocking=True)
-                                result = evaluator(batch)
-                                valid_results.append(detach_cpu(result))
-                            summary["valid"] = asdict(reduce_result(valid_results))
-
-                        if epoch % config.train.snapshot_epoch == 0:
-                            torch.save(
-                                {
-                                    "model": model.state_dict(),
-                                    "optimizer": optimizer.state_dict(),
-                                    "scaler": scaler.state_dict(),
-                                    "logger": logger.state_dict(),
-                                    "iteration": iteration,
-                                    "epoch": epoch,
-                                },
-                                snapshot_path,
-                            )
-
-                            if "valid" in summary:
-                                valid_result = reduce_result(valid_results)
-                                evaluation_value = calculate_value(valid_result)
-                                save_manager.save(
-                                    value=evaluation_value.item(),
-                                    step=epoch,
-                                    judge="max",
-                                )
-
-                    logger.log(summary=summary, step=epoch)
+        training_loop(context)
     finally:
-        # TODO: for文内のものを関数切り出しする？というより学習に必要ないろんなインスタンスを１つのdataclassにまとめると良さそう
-        logger.close()
+        context.logger.close()
 
 
 if __name__ == "__main__":

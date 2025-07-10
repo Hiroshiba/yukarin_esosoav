@@ -89,6 +89,11 @@ class Config(BaseModel):
         """設定オブジェクトを辞書に変換"""
         return self.model_dump(mode="json")
 
+    def validate_config(self) -> None:
+        """設定の妥当性を検証"""
+        assert self.train.eval_epoch % self.train.log_epoch == 0
+        assert self.train.snapshot_epoch % self.train.eval_epoch == 0
+
     def add_git_info(self) -> None:
         """Git情報をプロジェクトタグに追加"""
         self.project.tags["git-commit-id"] = get_commit_id()

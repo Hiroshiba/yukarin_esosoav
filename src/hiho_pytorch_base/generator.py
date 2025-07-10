@@ -52,6 +52,7 @@ class Generator(nn.Module):
             predictor.load_state_dict(state_dict)
         self.predictor = predictor.eval().to(self.device)
 
+    @torch.no_grad()
     def forward(
         self,
         feature_vector: Tensor | numpy.ndarray,
@@ -63,9 +64,8 @@ class Generator(nn.Module):
             to_tensor(d, self.device) for d in feature_variable_list
         ]
 
-        with torch.inference_mode():
-            vector_output, scalar_output = self.predictor(
-                feature_vector, feature_variable_list
-            )
+        vector_output, scalar_output = self.predictor(
+            feature_vector, feature_variable_list
+        )
 
         return GeneratorOutput(vector_output=vector_output, scalar_output=scalar_output)
