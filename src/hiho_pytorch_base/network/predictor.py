@@ -38,7 +38,7 @@ class Predictor(nn.Module):
         self.scalar_head = nn.Linear(hidden_size, 1)
 
     def forward(
-        self, feature_vector: Tensor, feature_variable_list: list[Tensor]
+        self, *, feature_vector: Tensor, feature_variable_list: list[Tensor]
     ) -> tuple[Tensor, Tensor]:
         """バッチデータを処理してベクトルとスカラーの両方を予測"""
         # 可変長データの平均化処理

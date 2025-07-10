@@ -10,6 +10,8 @@ from torch import Tensor, nn
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.network.predictor import Predictor, create_predictor
 
+TensorLike = Tensor | numpy.ndarray
+
 
 @dataclass
 class GeneratorOutput:
@@ -19,7 +21,7 @@ class GeneratorOutput:
     scalar_output: Tensor
 
 
-def to_tensor(array: Tensor | numpy.ndarray, device: torch.device) -> Tensor:
+def to_tensor(array: TensorLike, device: torch.device) -> Tensor:
     """データをTensorに変換する"""
     if not isinstance(array, Tensor | numpy.ndarray):
         array = numpy.asarray(array)
@@ -55,17 +57,24 @@ class Generator(nn.Module):
     @torch.no_grad()
     def forward(
         self,
-        feature_vector: Tensor | numpy.ndarray,
-        feature_variable_list: list[Tensor | numpy.ndarray],
+        *,
+        feature_vector: TensorLike,
+        feature_variable_list: list[TensorLike],
     ) -> GeneratorOutput:
         """推論モードでGeneratorOutputを返す"""
-        feature_vector = to_tensor(feature_vector, self.device)
-        feature_variable_list = [
-            to_tensor(d, self.device) for d in feature_variable_list
-        ]
+
+        def _convert(
+            data: TensorLike | list[TensorLike],
+        ):
+            """データまたはデータのリストをTensorに変換する"""
+            if isinstance(data, list):
+                return [to_tensor(item, self.device) for item in data]
+            else:
+                return to_tensor(data, self.device)
 
         vector_output, scalar_output = self.predictor(
-            feature_vector, feature_variable_list
+            feature_vector=_convert(feature_vector),
+            feature_variable_list=_convert(feature_variable_list),
         )
 
         return GeneratorOutput(vector_output=vector_output, scalar_output=scalar_output)

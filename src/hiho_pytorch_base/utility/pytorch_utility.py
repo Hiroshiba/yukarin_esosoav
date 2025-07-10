@@ -8,7 +8,7 @@ import numpy
 import torch
 import torch_optimizer
 from torch import nn, optim
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import LRScheduler, StepLR
 from torch.optim.optimizer import Optimizer
 
 
@@ -69,9 +69,7 @@ def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
     return optimizer
 
 
-class WarmupLR(
-    _LRScheduler
-):  # TODO: これバグってるんだったかも、既存のプロジェクトの実装を参考にして比べる
+class WarmupLR(LRScheduler):
     """ウォームアップ対応の学習率スケジューラー"""
 
     def __init__(
@@ -96,14 +94,14 @@ class WarmupLR(
 
 def make_scheduler(
     config_dict: dict[str, Any], optimizer: Optimizer, last_epoch: int
-) -> _LRScheduler:
+) -> LRScheduler:
     """設定からスケジューラーを作成"""
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
-    scheduler: optim.lr_scheduler._LRScheduler
+    scheduler: LRScheduler
     if n == "step":
-        scheduler = optim.lr_scheduler.StepLR(optimizer, last_epoch=last_epoch, **cp)
+        scheduler = StepLR(optimizer, last_epoch=last_epoch, **cp)
     elif n == "warmup":
         scheduler = WarmupLR(optimizer, last_epoch=last_epoch, **cp)
     else:
