@@ -141,7 +141,6 @@ def create_pathlist_files(
         target_vector_pathlist = base_dir / f"{split_name}_target_vector_pathlist.txt"
         target_scalar_pathlist = base_dir / f"{split_name}_target_scalar_pathlist.txt"
 
-        # pathlistファイルを作成（ファイル名のみを記録）
         for pathlist_path in [
             feature_vector_pathlist,
             feature_variable_pathlist,

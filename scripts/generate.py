@@ -5,8 +5,10 @@ import re
 from pathlib import Path
 
 import yaml
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from hiho_pytorch_base.batch import collate_dataset_output
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.generator import Generator
@@ -19,9 +21,7 @@ def _extract_number(f):
 
 
 def _get_predictor_model_path(
-    model_dir: Path,
-    iteration: int = None,
-    prefix: str = "predictor_",
+    model_dir: Path, iteration: int | None = None, prefix: str = "predictor_"
 ):
     if iteration is None:
         paths = model_dir.glob(prefix + "*.pth")
@@ -46,24 +46,27 @@ def generate(
     output_dir.mkdir(exist_ok=True)
     save_arguments(output_dir / "arguments.yaml", generate, locals())
 
-    config = Config.from_dict(yaml.safe_load(model_config.open()))
+    with model_config.open() as f:
+        config = Config.from_dict(yaml.safe_load(f))
 
     model_path = _get_predictor_model_path(
-        model_dir=model_dir,
-        iteration=model_iteration,
+        model_dir=model_dir, iteration=model_iteration
     )
-    generator = Generator(
-        config=config,
-        predictor=model_path,
-        use_gpu=use_gpu,
-    )
+    generator = Generator(config=config, predictor=model_path, use_gpu=use_gpu)
 
     dataset = create_dataset(config.dataset).test
-    for data in tqdm(dataset, desc="generate"):
-        feature_vector = data.feature_vector
-        feature_variable = data.feature_variable
-        target = data.target_vector
-        output = generator.forward(feature_vector, [feature_variable])
+    data_loader = DataLoader(
+        dataset=dataset,
+        batch_size=1,  # 推論では1つずつ処理
+        shuffle=False,
+        collate_fn=collate_dataset_output,
+    )
+
+    for batch in tqdm(data_loader, desc="generate"):
+        _ = generator(
+            feature_vector=batch.feature_vector,
+            feature_variable_list=batch.feature_variable_list,
+        )
 
 
 if __name__ == "__main__":

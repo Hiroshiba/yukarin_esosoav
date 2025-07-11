@@ -67,7 +67,7 @@ uv run python train.py <config_yaml_path> <output_dir>
 
 ### 推論実行
 ```bash
-uv run python scripts/generate.py --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
+PYTHONPATH=. uv run python scripts/generate.py --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
 ```
 
 ### テスト実行

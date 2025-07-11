@@ -35,7 +35,7 @@ def to_tensor(array: TensorLike, device: torch.device) -> Tensor:
 
 
 class Generator(nn.Module):
-    """学習済みモデルからの推論を行うジェネレーター"""
+    """生成経路で推論するクラス"""
 
     def __init__(
         self,
@@ -61,12 +61,11 @@ class Generator(nn.Module):
         feature_vector: TensorLike,
         feature_variable_list: list[TensorLike],
     ) -> GeneratorOutput:
-        """推論モードでGeneratorOutputを返す"""
+        """生成経路で推論する"""
 
         def _convert(
             data: TensorLike | list[TensorLike],
         ):
-            """データまたはデータのリストをTensorに変換する"""
             if isinstance(data, list):
                 return [to_tensor(item, self.device) for item in data]
             else:

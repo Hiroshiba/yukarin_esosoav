@@ -11,6 +11,7 @@ from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.model import Model
 from hiho_pytorch_base.network.predictor import create_predictor
+from scripts.generate import generate
 from tests.generate_test_data import create_pathlist_files, generate_multi_type_data
 from train import train
 
@@ -111,6 +112,21 @@ def train_config(test_paths):
     return config
 
 
+@pytest.fixture(scope="session")
+def trained_model_dir(train_config, tmp_path_factory):
+    """セッション単位で一度だけ学習を実行し、学習済みモデルディレクトリを返す"""
+    temp_dir = tmp_path_factory.mktemp("trained_model")
+    output_path = temp_dir / "test_output"
+    config_path = temp_dir / "test_config.yaml"
+
+    with open(config_path, "w") as f:
+        yaml.dump(train_config.to_dict(), f)
+
+    train(config_path, output_path)
+
+    return output_path
+
+
 def test_dataset_creation(train_config):
     """データセットが正しく作成されることをテストする"""
     # データセットを作成
@@ -135,28 +151,33 @@ def test_model_creation(train_config):
     assert predictor is not None
 
 
-def test_train_simple_epochs(train_config):
+def test_train_simple_epochs(trained_model_dir):
     """実際に数エポックだけ学習を実行してみる"""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        output_path = Path(temp_dir) / "test_output"
-        config_path = Path(temp_dir) / "test_config.yaml"
+    assert trained_model_dir.exists()
+    assert (trained_model_dir / "config.yaml").exists()
+    assert (trained_model_dir / "snapshot.pth").exists()
 
-        with open(config_path, "w") as f:
-            yaml.dump(train_config.to_dict(), f)
+    predictor_files = list(trained_model_dir.glob("predictor_*.pth"))
+    assert len(predictor_files) > 0
 
-        train(config_path, output_path)
+    tensorboard_files = list(trained_model_dir.glob("events.out.tfevents.*"))
+    assert len(tensorboard_files) > 0
 
-        assert output_path.exists()
-        assert (output_path / "config.yaml").exists()
-        assert (output_path / "snapshot.pth").exists()
 
-        # Predictorモデルファイルが作成されているか確認
-        predictor_files = list(output_path.glob("predictor_*.pth"))
-        assert len(predictor_files) > 0
+def test_generate_with_trained_model(trained_model_dir, tmp_path):
+    """学習済みモデルを使用した推論テスト"""
+    generate_output_path = tmp_path / "generate_output"
 
-        # TensorBoardログファイルが作成されているか確認
-        tensorboard_files = list(output_path.glob("events.out.tfevents.*"))
-        assert len(tensorboard_files) > 0
+    generate(
+        model_dir=trained_model_dir,
+        model_iteration=None,
+        model_config=None,
+        output_dir=generate_output_path,
+        use_gpu=False,
+    )
+
+    assert generate_output_path.exists()
+    assert (generate_output_path / "arguments.yaml").exists()
 
 
 def test_config_loading(train_config):
@@ -171,7 +192,6 @@ def test_config_loading(train_config):
 
         config = Config.from_dict(loaded_config_dict)
 
-        # 設定が正しく読み込まれたかチェック
         assert config.train.batch_size == train_config.train.batch_size
         assert config.train.stop_epoch == train_config.train.stop_epoch
         assert (
