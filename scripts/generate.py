@@ -33,26 +33,37 @@ def _get_predictor_model_path(
 
 
 def generate(
-    model_dir: Path,
-    model_iteration: int | None,
-    model_config: Path | None,
+    model_dir: Path | None,
+    predictor_iteration: int | None,
+    config_path: Path | None,
+    predictor_path: Path | None,
     output_dir: Path,
     use_gpu: bool,
 ):
     """学習済みモデルを使用して推論を実行"""
-    if model_config is None:
-        model_config = model_dir / "config.yaml"
+    if predictor_path is None and model_dir is not None:
+        predictor_path = _get_predictor_model_path(
+            model_dir=model_dir, iteration=predictor_iteration
+        )
+    else:
+        raise AssertionError(
+            "predictor_path または model_dir のいずれかを指定してください"
+        )
+
+    if config_path is None and model_dir is not None:
+        config_path = model_dir / "config.yaml"
+    else:
+        raise AssertionError(
+            "config_path または model_dir のいずれかを指定してください"
+        )
 
     output_dir.mkdir(exist_ok=True)
     save_arguments(output_dir / "arguments.yaml", generate, locals())
 
-    with model_config.open() as f:
+    with config_path.open() as f:
         config = Config.from_dict(yaml.safe_load(f))
 
-    model_path = _get_predictor_model_path(
-        model_dir=model_dir, iteration=model_iteration
-    )
-    generator = Generator(config=config, predictor=model_path, use_gpu=use_gpu)
+    generator = Generator(config=config, predictor=predictor_path, use_gpu=use_gpu)
 
     dataset = create_dataset(config.dataset).test
     data_loader = DataLoader(
@@ -71,9 +82,10 @@ def generate(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", required=True, type=Path)
-    parser.add_argument("--model_iteration", type=int)
-    parser.add_argument("--model_config", type=Path)
+    parser.add_argument("--model_dir", type=Path)
+    parser.add_argument("--predictor_iteration", type=int)
+    parser.add_argument("--config_path", type=Path)
+    parser.add_argument("--predictor_path", type=Path)
     parser.add_argument("--output_dir", required=True, type=Path)
     parser.add_argument("--use_gpu", action="store_true")
     generate(**vars(parser.parse_args()))

@@ -1,4 +1,4 @@
-"""学習システムの統合テスト"""
+"""学習システムのend-to-endテスト"""
 
 import os
 import tempfile
@@ -14,6 +14,16 @@ from hiho_pytorch_base.network.predictor import create_predictor
 from scripts.generate import generate
 from tests.generate_test_data import create_pathlist_files, generate_multi_type_data
 from train import train
+
+
+def pytest_collection_modifyitems(items):
+    """end-to-endテストの実行順序を制御（train → generate）"""
+    e2e_train = [i for i in items if "e2e_train" in i.name]
+    e2e_generate = [i for i in items if "e2e_generate" in i.name]
+    others = [i for i in items if "e2e" not in i.name]
+
+    # 実行順序: その他のテスト → e2e_train → e2e_generate
+    items[:] = others + e2e_train + e2e_generate
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -113,18 +123,15 @@ def train_config(test_paths):
 
 
 @pytest.fixture(scope="session")
-def trained_model_dir(train_config, tmp_path_factory):
-    """セッション単位で一度だけ学習を実行し、学習済みモデルディレクトリを返す"""
-    temp_dir = tmp_path_factory.mktemp("trained_model")
-    output_path = temp_dir / "test_output"
-    config_path = temp_dir / "test_config.yaml"
+def session_shared_state(tmp_path_factory):
+    """end-to-endテスト用の共有状態管理"""
 
-    with open(config_path, "w") as f:
-        yaml.dump(train_config.to_dict(), f)
+    class SharedState:
+        def __init__(self):
+            self.tmp_dir = tmp_path_factory.mktemp("e2e_tests")
+            self.trained_model_path = None
 
-    train(config_path, output_path)
-
-    return output_path
+    return SharedState()
 
 
 def test_dataset_creation(train_config):
@@ -151,27 +158,42 @@ def test_model_creation(train_config):
     assert predictor is not None
 
 
-def test_train_simple_epochs(trained_model_dir):
-    """実際に数エポックだけ学習を実行してみる"""
-    assert trained_model_dir.exists()
-    assert (trained_model_dir / "config.yaml").exists()
-    assert (trained_model_dir / "snapshot.pth").exists()
+def test_e2e_train(train_config, session_shared_state):
+    """学習のend-to-endテスト - データ準備から学習完了まで全工程をテスト"""
+    output_path = session_shared_state.tmp_dir / "trained_model"
+    config_path = session_shared_state.tmp_dir / "config.yaml"
 
-    predictor_files = list(trained_model_dir.glob("predictor_*.pth"))
+    with open(config_path, "w") as f:
+        yaml.dump(train_config.to_dict(), f)
+
+    train(config_path, output_path)
+
+    assert output_path.exists()
+    assert (output_path / "config.yaml").exists()
+    assert (output_path / "snapshot.pth").exists()
+
+    predictor_files = list(output_path.glob("predictor_*.pth"))
     assert len(predictor_files) > 0
 
-    tensorboard_files = list(trained_model_dir.glob("events.out.tfevents.*"))
+    tensorboard_files = list(output_path.glob("events.out.tfevents.*"))
     assert len(tensorboard_files) > 0
 
+    # 学習済みモデルパスを共有状態に保存
+    session_shared_state.trained_model_path = output_path
 
-def test_generate_with_trained_model(trained_model_dir, tmp_path):
-    """学習済みモデルを使用した推論テスト"""
+
+def test_e2e_generate(session_shared_state, tmp_path):
+    """推論のend-to-endテスト - 学習済みモデルを使用した推論全工程をテスト"""
+    if session_shared_state.trained_model_path is None:
+        pytest.fail("train test not completed yet")
+
     generate_output_path = tmp_path / "generate_output"
 
     generate(
-        model_dir=trained_model_dir,
-        model_iteration=None,
-        model_config=None,
+        model_dir=session_shared_state.trained_model_path,
+        predictor_iteration=None,
+        config_path=None,
+        predictor_path=None,
         output_dir=generate_output_path,
         use_gpu=False,
     )
