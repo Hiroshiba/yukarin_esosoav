@@ -11,7 +11,7 @@ dataset:
     target_vector_pathlist_path: "tests/data/test_data/valid_target_vector_pathlist.txt"
     target_scalar_pathlist_path: "tests/data/test_data/valid_target_scalar_pathlist.txt"
     root_dir: "tests/data/test_data"
-  test_num: 30
+  test_num: 16
   eval_times_num: 1
   seed: 42
 
@@ -24,8 +24,8 @@ network:
 model: {}
 
 train:
-  batch_size: 30
-  eval_batch_size: 30
+  batch_size: 8
+  eval_batch_size: 8
   log_epoch: 1
   eval_epoch: 2
   snapshot_epoch: 4
