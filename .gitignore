@@ -156,6 +156,7 @@ cython_debug/
 
 # Project specific
 # Test data
-tests/data/test_data/
+tests/data/data/
+tests/data/train_output/
 !src/hiho_pytorch_base/
 !CLAUDE.md

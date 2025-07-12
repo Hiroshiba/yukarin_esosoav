@@ -87,7 +87,9 @@ def get_data_paths(
 
     # 最初のpathlistをベースにstemリストを作成
     first_data_type, first_pathlist_path = pathlist_configs[0]
-    first_paths = _load_pathlist(first_pathlist_path, root_dir / first_data_type)
+    first_paths = _load_pathlist(
+        first_pathlist_path, root_dir / first_data_type
+    )  # TODO: ここ `/first_data_type` 入ってるのバグ
     fn_list = sorted(first_paths.keys())
     assert len(fn_list) > 0, f"ファイルが存在しません: {first_pathlist_path}"
 
@@ -169,6 +171,7 @@ class DatasetCollection:
 def create_dataset(config: DatasetConfig) -> DatasetCollection:
     """データセットを作成"""
     # TODO: accent_estimatorのようにHDF5に対応させ、docs/にドキュメントを書く
+    # TODO: 話者IDのマッピングに対応させる
     datas = get_datas(config.train)
 
     if config.seed is not None:

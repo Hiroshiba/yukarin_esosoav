@@ -221,7 +221,7 @@ def load_snapshot(context: TrainingContext) -> None:
 
 
 def train_one_epoch(context: TrainingContext) -> TrainingResults:
-    """1エポックのトレーニング処理"""
+    """1エポックの学習処理"""
     context.model.train()
 
     train_results: list[ModelOutput] = []
@@ -326,7 +326,7 @@ def should_snapshot_epoch(context: TrainingContext) -> bool:
 
 
 def training_loop(context: TrainingContext) -> None:
-    """トレーニングループ"""
+    """学習ループ"""
     for _ in range(context.config.train.stop_epoch):
         context.epoch += 1
         if context.epoch > context.config.train.stop_epoch:
@@ -335,38 +335,30 @@ def training_loop(context: TrainingContext) -> None:
         training_results = train_one_epoch(context)
 
         if should_log_epoch(context):
-            summary: dict[str, Any] = training_results.to_summary_dict()
+            summary = {
+                "iteration": context.iteration,
+                "lr": context.optimizer.param_groups[0]["lr"],
+            }
+            summary.update(training_results.to_summary_dict())
 
             if should_eval_epoch(context):
                 evaluation_results = evaluate(context)
-
-                save_predictor(context, evaluation_results)
-
-                if should_snapshot_epoch(context):
-                    save_checkpoint(context)
-
                 summary.update(evaluation_results.to_summary_dict())
-
-            summary.update(
-                {
-                    "iteration": context.iteration,
-                    "lr": context.optimizer.param_groups[0]["lr"],
-                }
-            )
+                save_predictor(context, evaluation_results)
 
             context.logger.log(summary=summary, step=context.epoch)
 
+        if should_snapshot_epoch(context):
+            save_checkpoint(context)
+
 
 def train(config_yaml_path: Path, output_dir: Path) -> None:
-    """設定ファイルに基づいて機械学習モデルをトレーニング"""
-    # 学習コンテキストの初期化
+    """設定ファイルに基づいて機械学習モデルを学習"""
     context = setup_training_context(config_yaml_path, output_dir)
 
-    # スナップショットの読み込み
     if context.snapshot_path.exists():
         load_snapshot(context)
 
-    # 設定ファイルの保存
     output_dir.mkdir(exist_ok=True, parents=True)
     with (output_dir / "config.yaml").open(mode="w") as f:
         yaml.safe_dump(context.config.to_dict(), f)
