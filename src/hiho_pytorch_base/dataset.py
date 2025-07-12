@@ -77,29 +77,27 @@ def _load_pathlist(pathlist_path: Path, root_dir: Path) -> PathMap:
 
 
 def get_data_paths(
-    root_dir: Path, *pathlist_configs: tuple[str, Path]
+    root_dir: Path, pathlist_paths: list[Path]
 ) -> tuple[list[str], list[PathMap]]:
     """複数のpathlistファイルからstemリストとパスマップを返す。整合性も確認する。"""
-    if len(pathlist_configs) == 0:
+    if len(pathlist_paths) == 0:
         raise ValueError("少なくとも1つのpathlist設定が必要です")
 
     path_mappings: list[PathMap] = []
 
     # 最初のpathlistをベースにstemリストを作成
-    first_data_type, first_pathlist_path = pathlist_configs[0]
-    first_paths = _load_pathlist(
-        first_pathlist_path, root_dir / first_data_type
-    )  # TODO: ここ `/first_data_type` 入ってるのバグ
+    first_pathlist_path = pathlist_paths[0]
+    first_paths = _load_pathlist(first_pathlist_path, root_dir)
     fn_list = sorted(first_paths.keys())
     assert len(fn_list) > 0, f"ファイルが存在しません: {first_pathlist_path}"
 
     path_mappings.append(first_paths)
 
     # 残りのpathlistが同じstemセットを持つかチェック
-    for data_type, pathlist_path in pathlist_configs[1:]:
-        paths = _load_pathlist(pathlist_path, root_dir / data_type)
+    for pathlist_path in pathlist_paths[1:]:
+        paths = _load_pathlist(pathlist_path, root_dir)
         assert set(fn_list) == set(paths.keys()), (
-            f"ファイルが一致しません: {data_type} (expected: {len(fn_list)}, got: {len(paths)})"
+            f"ファイルが一致しません: {pathlist_path} (expected: {len(fn_list)}, got: {len(paths)})"
         )
         path_mappings.append(paths)
 
@@ -118,10 +116,12 @@ def get_datas(config: DatasetFileConfig) -> list[LazyDatasetInput]:
         ),
     ) = get_data_paths(
         config.root_dir,
-        ("feature_vector", config.feature_vector_pathlist_path),
-        ("feature_variable", config.feature_variable_pathlist_path),
-        ("target_vector", config.target_vector_pathlist_path),
-        ("target_scalar", config.target_scalar_pathlist_path),
+        [
+            config.feature_vector_pathlist_path,
+            config.feature_variable_pathlist_path,
+            config.target_vector_pathlist_path,
+            config.target_scalar_pathlist_path,
+        ],
     )
 
     datas = [

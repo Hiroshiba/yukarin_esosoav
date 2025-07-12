@@ -1,5 +1,6 @@
 """テストユーティリティ - シンプルなテストデータ生成"""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -54,6 +55,26 @@ def setup_data(config: Config) -> None:
 
     assert config.dataset.valid is not None
 
+    def setup_data_type(
+        pathlist_path: Path,
+        data_type: str,
+        sample_indices: np.ndarray,
+        root_dir: Path,
+        extension: str,
+        generator_func: Callable[[Path], None],
+    ) -> None:
+        """データタイプのディレクトリとpathlistを準備し、ジェネレーター関数でファイルを生成"""
+        data_dir = root_dir / data_type
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        relative_paths = [f"{data_type}/{index}.{extension}" for index in sample_indices]
+        file_paths = [root_dir / relative_path for relative_path in relative_paths]
+
+        pathlist_path.write_text("\n".join(relative_paths) + "\n")
+
+        for file_path in file_paths:
+            generator_func(file_path)
+
     for config_split, count in zip(
         [config.dataset.train, config.dataset.valid],
         [100, 50],
@@ -62,51 +83,67 @@ def setup_data(config: Config) -> None:
         sample_indices = np.arange(count)
 
         # 固定長特徴ベクトル
-        feature_vector_dir = config_split.root_dir / "feature_vector"
-        feature_vector_dir.mkdir(parents=True, exist_ok=True)
-        for idx in sample_indices:
+        def generate_feature_vector(file_path: Path) -> None:
             feature_vector = np.random.randn(config.network.feature_vector_size).astype(
                 np.float32
             )
-            np.save(feature_vector_dir / f"{idx}.npy", feature_vector)
-        config_split.feature_vector_pathlist_path.write_text(
-            "\n".join(f"{idx}.npy" for idx in sample_indices) + "\n"
+            np.save(file_path, feature_vector)
+
+        setup_data_type(
+            config_split.feature_vector_pathlist_path,
+            "feature_vector",
+            sample_indices,
+            config_split.root_dir,
+            "npy",
+            generate_feature_vector,
         )
 
         # 可変長特徴データ
-        feature_variable_dir = config_split.root_dir / "feature_variable"
-        feature_variable_dir.mkdir(parents=True, exist_ok=True)
-        for idx in sample_indices:
-            variable_length = np.random.randint(5, 15)
+        def generate_feature_variable(file_path: Path) -> None:
+            variable_length = int(np.random.randint(5, 15))
             feature_variable = np.random.randn(
                 variable_length, config.network.feature_variable_size
             ).astype(np.float32)
-            np.save(feature_variable_dir / f"{idx}.npy", feature_variable)
-        config_split.feature_variable_pathlist_path.write_text(
-            "\n".join(f"{idx}.npy" for idx in sample_indices) + "\n"
+            np.save(file_path, feature_variable)
+
+        setup_data_type(
+            config_split.feature_variable_pathlist_path,
+            "feature_variable",
+            sample_indices,
+            config_split.root_dir,
+            "npy",
+            generate_feature_variable,
         )
 
         # クラス分類
-        target_vector_dir = config_split.root_dir / "target_vector"
-        target_vector_dir.mkdir(parents=True, exist_ok=True)
-        for idx in sample_indices:
+        def generate_target_vector(file_path: Path) -> None:
             target_class = np.random.randint(
                 0, config.network.target_vector_size, dtype=np.int64
             )
-            np.save(target_vector_dir / f"{idx}.npy", target_class)
-        config_split.target_vector_pathlist_path.write_text(
-            "\n".join(f"{idx}.npy" for idx in sample_indices) + "\n"
+            np.save(file_path, target_class)
+
+        setup_data_type(
+            config_split.target_vector_pathlist_path,
+            "target_vector",
+            sample_indices,
+            config_split.root_dir,
+            "npy",
+            generate_target_vector,
         )
 
         # 回帰ターゲット
-        target_scalar_dir = config_split.root_dir / "target_scalar"
-        target_scalar_dir.mkdir(parents=True, exist_ok=True)
-        for idx in sample_indices:
+        def generate_target_scalar(file_path: Path) -> None:
             target_class = np.random.randint(
                 0, config.network.target_vector_size, dtype=np.int64
             )
             target_scalar = float(target_class) + np.random.randn() * 0.1
-            np.save(target_scalar_dir / f"{idx}.npy", target_scalar)
-        config_split.target_scalar_pathlist_path.write_text(
-            "\n".join(f"{idx}.npy" for idx in sample_indices) + "\n"
+            np.save(file_path, target_scalar)
+
+        setup_data_type(
+            config_split.target_scalar_pathlist_path,
+            "target_scalar",
+            sample_indices,
+            config_split.root_dir,
+            "npy",
+            generate_target_scalar,
         )

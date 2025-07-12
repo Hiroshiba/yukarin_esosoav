@@ -18,11 +18,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `ProjectConfig`: プロジェクト設定（name、tags、category）
 
 ### 学習システム
-- `src/hiho_pytorch_base/trainer.py`: pytorch-trainerベースの学習システム（現在は依存関係が削除されているため動作しない）
-  - `create_trainer()`: 設定からTrainerオブジェクトを作成
-  - TensorBoard、W&B統合
-  - AMP（Automatic Mixed Precision）対応
-  - スナップショット保存
+- `train.py`: 独自実装のPyTorch学習ループ
+  - `train()`: 設定から学習プロセスを実行
+  - TensorBoard統合
+  - torch.amp（Automatic Mixed Precision）対応
+  - 学習済みモデル・スナップショット保存
 
 ### データ処理
 - `src/hiho_pytorch_base/dataset.py`: データセット処理
@@ -36,7 +36,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `get_datas()`: データ取得関数（ステムベースのファイル管理）
   - `create_dataset()`: データセット作成（train/test/eval/valid対応）
   - pathlistファイル方式でのファイル管理（参照プロジェクト準拠）
+  - **パスリスト形式**: root_dirからの相対パス（`feature_vector/0.npy`等）を記載
   - **ディレクトリ構造**: データタイプ別ディレクトリ管理（feature_vector/, feature_variable/, target_vector/, target_scalar/）
+  - **stemベース対応付け**: 同じファイル名（stem）で異なるデータタイプを関連付け
 
 ### モデル・ネットワーク
 - `src/hiho_pytorch_base/model.py`: マルチタスク学習対応のモデル定義
@@ -52,11 +54,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `scripts/generate.py`: 推論スクリプト
 
 ### テスト
-- `tests/generate_test_data.py`: テストデータ生成コード（マルチタイプデータ対応・ディレクトリ構造対応）
-  - `generate_multi_type_data()`: 4タイプデータ生成（feature_vector、feature_variable、target_vector、target_scalar）
-  - `create_pathlist_files()`: pathlistファイル生成（ステムベース管理）
+- `tests/test_utils.py`: テストデータ生成ユーティリティ（マルチタイプデータ対応・ディレクトリ構造対応）
+  - `setup_data()`: 4タイプデータ生成（feature_vector、feature_variable、target_vector、target_scalar）
+  - `create_train_config()`: テスト用設定作成
+  - pathlistファイル生成（root_dirからの相対パス形式）
 - `tests/conftest.py`: pytest fixtures（テストデータ自動生成機能）
-- `tests/test_train.py`: 学習システムの統合テスト（train.py直接実行・全5テスト実装済み）
+- `tests/test_train.py`: 学習システムの統合テスト（train.py直接実行・全7テスト実装済み）
 
 ## 主要なファイル
 
@@ -247,11 +250,18 @@ project:
     - Predictorクラスから不要なプロパティ保存を削除（ネットワーク構築にのみ使用）
     - 引数順序を論理的に整理（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
     - 関連ファイル（create_predictor関数、test_train.py、設定ファイル）の追従完了
+24. ✅ **パスリストバグ修正**: dataset.pyのTODO箇所を修正完了
+    - `get_data_paths`関数から不要な`/first_data_type`パスを削除
+    - pathlistファイルがroot_dirからの相対パス形式を正しく処理するよう修正
+    - テストユーティリティのpathlist生成を正しい形式（`feature_vector/0.npy`等）に更新
+    - docs/memo.mdにパスリストの設計仕様を詳細に記載
+    - 全テスト通過確認（7テスト）
 
 ## 今後の作業
 
-1. **Ruffコード修正**: docstring、unused imports等のエラー修正が必要
-2. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
+1. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
+2. **HDF5対応**: accent_estimatorのようなHDF5データセット対応
+3. **話者IDマッピング**: 多話者学習対応
 
 ## 開発ガイドライン
 
@@ -287,4 +297,4 @@ project:
 - **学習システム**: pytorch-trainerは削除され、新しいtrain.pyでネイティブPyTorch学習ループが動作します
 - **データ構造**: dataclassベースのマルチタイプデータ（feature_vector, feature_variable, target_vector, target_scalar）を使用
 - **ディレクトリ構造**: データタイプ別ディレクトリに同一ファイル名（ステムベース）で保存する方式を採用
-- Ruffによるコードチェックでdocstring、unused imports等のエラーが残っている
+- **パスリスト**: root_dirからの相対パス形式（`feature_vector/0.npy`等）でファイルパスを管理
