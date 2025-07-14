@@ -29,7 +29,18 @@ from hiho_pytorch_base.utility.pytorch_utility import (
     make_scheduler,
     to_device,
 )
-from hiho_pytorch_base.utility.train_utility import Logger, SaveManager, reduce_result
+from hiho_pytorch_base.utility.train_utility import (
+    DataNumProtocol,
+    Logger,
+    SaveManager,
+    reduce_result,
+)
+
+
+def _delete_data_num(output: DataNumProtocol) -> dict[str, Any]:
+    if not hasattr(output, "data_num"):
+        raise ValueError("Output does not have 'data_num' attribute")
+    return {k: v for k, v in asdict(output).items() if k != "data_num"}
 
 
 @dataclass
@@ -40,7 +51,7 @@ class TrainingResults:
 
     def to_summary_dict(self) -> dict[str, Any]:
         """ログ出力用の辞書を生成"""
-        return {"train": asdict(self.train)}
+        return {"train": _delete_data_num(self.train)}
 
 
 @dataclass
@@ -54,11 +65,11 @@ class EvaluationResults:
     def to_summary_dict(self) -> dict[str, Any]:
         """ログ出力用の辞書を生成"""
         summary = {
-            "test": asdict(self.test),
-            "eval": asdict(self.eval),
+            "test": _delete_data_num(self.test),
+            "eval": _delete_data_num(self.eval),
         }
         if self.valid is not None:
-            summary["valid"] = asdict(self.valid)
+            summary["valid"] = _delete_data_num(self.valid)
         return summary
 
 
@@ -146,7 +157,6 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     if config.train.weight_initializer is not None:
         init_weights(model, name=config.train.weight_initializer)
     model.to(device)
-    model.train()
 
     # evaluator
     generator = Generator(
@@ -170,9 +180,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     scheduler = None
     if config.train.scheduler is not None:
         scheduler = make_scheduler(
-            config_dict=config.train.scheduler,
-            optimizer=optimizer,
-            last_epoch=0,
+            config_dict=config.train.scheduler, optimizer=optimizer
         )
 
     # save
@@ -217,12 +225,14 @@ def load_snapshot(context: TrainingContext) -> None:
     context.epoch = snapshot["epoch"]
 
     if context.scheduler is not None:
-        context.scheduler.last_epoch = context.iteration
+        context.scheduler.last_epoch = context.epoch
 
 
 def train_one_epoch(context: TrainingContext) -> TrainingResults:
     """１エポックの学習処理"""
     context.model.train()
+    if hasattr(context.optimizer, "train"):
+        context.optimizer.train()  # type: ignore
 
     train_results: list[ModelOutput] = []
     for batch in context.train_loader:
@@ -241,10 +251,10 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
         context.scaler.step(context.optimizer)
         context.scaler.update()
 
-        if context.scheduler is not None:
-            context.scheduler.step()
-
         train_results.append(detach_cpu(result))
+
+    if context.scheduler is not None:
+        context.scheduler.step()
 
     return TrainingResults(train=reduce_result(train_results))
 
@@ -253,6 +263,8 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
 def evaluate(context: TrainingContext) -> EvaluationResults:
     """評価値を計算する"""
     context.model.eval()
+    if hasattr(context.optimizer, "eval"):
+        context.optimizer.eval()  # type: ignore
 
     # test評価
     test_result_list: list[ModelOutput] = []

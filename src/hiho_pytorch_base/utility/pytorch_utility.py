@@ -92,18 +92,16 @@ class WarmupLR(LRScheduler):
         ]
 
 
-def make_scheduler(
-    config_dict: dict[str, Any], optimizer: Optimizer, last_epoch: int
-) -> LRScheduler:
+def make_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LRScheduler:
     """設定からスケジューラーを作成"""
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
     scheduler: LRScheduler
     if n == "step":
-        scheduler = StepLR(optimizer, last_epoch=last_epoch, **cp)
+        scheduler = StepLR(optimizer, **cp)
     elif n == "warmup":
-        scheduler = WarmupLR(optimizer, last_epoch=last_epoch, **cp)
+        scheduler = WarmupLR(optimizer, **cp)
     else:
         raise ValueError(n)
 

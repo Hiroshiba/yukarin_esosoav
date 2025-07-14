@@ -31,14 +31,14 @@ train:
   batch_size: 8
   eval_batch_size: 8
   log_epoch: 1
-  eval_epoch: 2
-  snapshot_epoch: 4
-  stop_epoch: 4
+  eval_epoch: 20
+  snapshot_epoch: 40
+  stop_epoch: 400
   model_save_num: 2
   optimizer:
     name: "adam"
     lr: 0.001
-  scheduler: null
+  scheduler: { "name": "warmup", "warmup_steps": 10 }
   num_processes: 0
   use_gpu: false
   use_amp: false
