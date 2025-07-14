@@ -292,7 +292,7 @@ def save_predictor(
     else:
         evaluation_value = 0
 
-    context.save_manager.save(value=evaluation_value, step=context.epoch, judge="max")
+    context.save_manager.save(value=evaluation_value, step=context.epoch)
 
 
 def save_checkpoint(context: TrainingContext) -> None:

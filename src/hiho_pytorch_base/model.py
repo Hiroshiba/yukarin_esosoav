@@ -45,6 +45,7 @@ class Model(nn.Module):
         vector_output, scalar_output = self.predictor(
             feature_vector=batch.feature_vector,
             feature_variable_list=batch.feature_variable_list,
+            speaker_id=batch.speaker_id,
         )
 
         target_vector = batch.target_vector

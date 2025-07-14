@@ -1,5 +1,6 @@
 """データセットモジュール"""
 
+import json
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ class LazyInputData:
     feature_variable_path: Path
     target_vector_path: Path
     target_scalar_path: Path
+    speaker_id: int
 
     def generate(self) -> InputData:
         """ファイルからデータを読み込んでDatasetInputを生成"""
@@ -29,6 +31,7 @@ class LazyInputData:
             feature_variable=numpy.load(self.feature_variable_path, allow_pickle=True),
             target_vector=numpy.load(self.target_vector_path, allow_pickle=True),
             target_scalar=float(numpy.load(self.target_scalar_path, allow_pickle=True)),
+            speaker_id=self.speaker_id,
         )
 
 
@@ -93,38 +96,50 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
         ],
     )
 
+    fn_each_speaker: dict[str, list[str]] = json.loads(
+        config.speaker_dict_path.read_text()
+    )
+    speaker_ids = {
+        fn: speaker_id
+        for speaker_id, (_, fns) in enumerate(fn_each_speaker.items())
+        for fn in fns
+    }
+
     datas = [
         LazyInputData(
             feature_vector_path=feature_vector_pathmappings[fn],
             feature_variable_path=feature_variable_pathmappings[fn],
             target_vector_path=target_vector_pathmappings[fn],
             target_scalar_path=target_scalar_pathmappings[fn],
+            speaker_id=speaker_ids[fn],
         )
         for fn in fn_list
     ]
     return datas
 
 
-class FeatureTargetDataset(Dataset):
-    """特徴量とターゲットを扱うPyTorchデータセット"""
+class FeatureDataset(Dataset):
+    """メインのデータセット"""
 
     def __init__(
         self,
         datas: Sequence[InputData | LazyInputData],
+        is_eval: bool,
     ):
         self.datas = datas
+        self.is_eval = is_eval
 
     def __len__(self):
-        """データセットのサイズを返す"""
+        """データセットのサイズ"""
         return len(self.datas)
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int):
         """指定されたインデックスのデータを前処理して返す"""
         data = self.datas[i]
         if isinstance(data, LazyInputData):
             data = data.generate()
 
-        return default_convert(preprocess(data))
+        return default_convert(preprocess(data, is_eval=self.is_eval))
 
 
 @dataclass
@@ -132,9 +147,16 @@ class DatasetCollection:
     """データセットコレクション"""
 
     train: Dataset
+    """重みの更新に用いる"""
+
     test: Dataset
+    """trainと同じドメインでモデルの過適合確認に用いる"""
+
     eval: Dataset
+    """testと同じデータを評価に用いる"""
+
     valid: Dataset | None
+    """trainやtestと異なり、評価専用に用いる"""
 
 
 def create_dataset(config: DatasetConfig) -> DatasetCollection:
@@ -149,7 +171,7 @@ def create_dataset(config: DatasetConfig) -> DatasetCollection:
     tests, trains = datas[: config.test_num], datas[config.test_num :]
 
     def _wrapper(datas: list[LazyInputData], is_eval: bool) -> Dataset:
-        dataset = FeatureTargetDataset(datas=datas)
+        dataset = FeatureDataset(datas=datas, is_eval=is_eval)
         if is_eval:
             dataset = ConcatDataset([dataset] * config.eval_times_num)
         return dataset

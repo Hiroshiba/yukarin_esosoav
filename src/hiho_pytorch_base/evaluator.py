@@ -38,7 +38,9 @@ class Evaluator(nn.Module):
         target = batch.target_vector
 
         output_result: GeneratorOutput = self.generator(
-            feature_vector=feature_vector, feature_variable_list=feature_variable_list
+            feature_vector=feature_vector,
+            feature_variable_list=feature_variable_list,
+            speaker_id=batch.speaker_id,
         )
         output = output_result.vector_output
 

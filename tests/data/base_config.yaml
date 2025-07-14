@@ -4,12 +4,14 @@ dataset:
     feature_variable_pathlist_path: "tests/data/test_data/train_feature_variable_pathlist.txt"
     target_vector_pathlist_path: "tests/data/test_data/train_target_vector_pathlist.txt"
     target_scalar_pathlist_path: "tests/data/test_data/train_target_scalar_pathlist.txt"
+    speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   valid:
     feature_vector_pathlist_path: "tests/data/test_data/valid_feature_vector_pathlist.txt"
     feature_variable_pathlist_path: "tests/data/test_data/valid_feature_variable_pathlist.txt"
     target_vector_pathlist_path: "tests/data/test_data/valid_target_vector_pathlist.txt"
     target_scalar_pathlist_path: "tests/data/test_data/valid_target_scalar_pathlist.txt"
+    speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   test_num: 16
   eval_times_num: 1
@@ -20,6 +22,8 @@ network:
   feature_variable_size: 32
   hidden_size: 32
   target_vector_size: 3
+  speaker_size: 3
+  speaker_embedding_size: 8
 
 model: {}
 

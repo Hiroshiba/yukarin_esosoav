@@ -3,7 +3,7 @@
 import math
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import torch
 
@@ -150,7 +150,7 @@ class SaveManager:
         self.last_steps: list[int] = []
         self.top_step_values: list[tuple[int, float]] = []
 
-    def save(self, value: float, step: int, judge: Literal["min", "max"]):
+    def save(self, value: float, step: int):
         """最良と最新を管理"""
         if math.isnan(value):
             return
@@ -161,11 +161,10 @@ class SaveManager:
         # top N
         if (
             len(self.top_step_values) < self.top_num
-            or (judge == "min" and value < self.top_step_values[-1][1])
-            or (judge == "max" and value > self.top_step_values[-1][1])
+            or value > self.top_step_values[-1][1]
         ):
             self.top_step_values.append((step, value))
-            self.top_step_values.sort(key=lambda x: x[1], reverse=judge == "max")
+            self.top_step_values.sort(key=lambda x: x[1], reverse=True)
             judged = True
 
         if len(self.top_step_values) > self.top_num:

@@ -60,6 +60,7 @@ class Generator(nn.Module):
         *,
         feature_vector: TensorLike,
         feature_variable_list: list[TensorLike],
+        speaker_id: TensorLike,
     ) -> GeneratorOutput:
         """生成経路で推論する"""
 
@@ -74,6 +75,7 @@ class Generator(nn.Module):
         vector_output, scalar_output = self.predictor(
             feature_vector=_convert(feature_vector),
             feature_variable_list=_convert(feature_variable_list),
+            speaker_id=_convert(speaker_id),
         )
 
         return GeneratorOutput(vector_output=vector_output, scalar_output=scalar_output)

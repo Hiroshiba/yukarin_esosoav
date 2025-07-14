@@ -13,7 +13,7 @@ from torch.optim.optimizer import Optimizer
 
 
 def init_weights(model: torch.nn.Module, name: str) -> None:
-    """指定された名前の初期化手法でモデルの重みを初期化"""
+    """指定された初期化手法で重みを初期化"""
 
     def _init_weights(layer: nn.Module):
         initializer: Callable

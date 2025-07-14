@@ -15,13 +15,16 @@ class Predictor(nn.Module):
         feature_variable_size: int,
         hidden_size: int,
         target_vector_size: int,
+        speaker_size: int,
+        speaker_embedding_size: int,
     ):
         super().__init__()
 
         self.variable_processor = nn.Linear(feature_variable_size, feature_vector_size)
+        self.speaker_embedder = nn.Embedding(speaker_size, speaker_embedding_size)
 
         self.main_layers = nn.Sequential(
-            nn.Linear(feature_vector_size, hidden_size),
+            nn.Linear(feature_vector_size + speaker_embedding_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(hidden_size, hidden_size),
@@ -34,7 +37,11 @@ class Predictor(nn.Module):
         self.scalar_head = nn.Linear(hidden_size, 1)
 
     def forward(
-        self, *, feature_vector: Tensor, feature_variable_list: list[Tensor]
+        self,
+        *,
+        feature_vector: Tensor,
+        feature_variable_list: list[Tensor],
+        speaker_id: Tensor,
     ) -> tuple[Tensor, Tensor]:
         """メインの処理"""
         variable_means = []
@@ -46,7 +53,10 @@ class Predictor(nn.Module):
         variable_features = torch.stack(variable_means)
         combined_features = feature_vector + variable_features
 
-        hidden = self.main_layers(combined_features)
+        speaker_embedding = self.speaker_embedder(speaker_id)
+        final_features = torch.cat([combined_features, speaker_embedding], dim=1)
+
+        hidden = self.main_layers(final_features)
 
         vector_output = self.vector_head(hidden)
         scalar_output = self.scalar_head(hidden).squeeze(-1)
@@ -61,4 +71,6 @@ def create_predictor(config: NetworkConfig) -> Predictor:
         feature_variable_size=config.feature_variable_size,
         hidden_size=config.hidden_size,
         target_vector_size=config.target_vector_size,
+        speaker_size=config.speaker_size,
+        speaker_embedding_size=config.speaker_embedding_size,
     )

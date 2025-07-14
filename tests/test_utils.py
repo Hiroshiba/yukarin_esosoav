@@ -1,5 +1,6 @@
 """テストの便利モジュール"""
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -84,5 +85,17 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
         np.save(file_path, target_scalar)
 
     _setup_data(generate_target_scalar, "target_scalar", "npy")
+
+    # 話者マッピング
+    speaker_names = ["A", "B", "C"]
+    speaker_dict = {name: [] for name in speaker_names}
+    for stem in all_stems:
+        speaker_name = speaker_names[int(stem) % len(speaker_names)]
+        speaker_dict[speaker_name].append(stem)
+
+    speaker_dict_path = data_dir / "speaker_dict.json"
+    speaker_dict_path.write_text(json.dumps(speaker_dict))
+    config.dataset.train.speaker_dict_path = speaker_dict_path
+    config.dataset.valid.speaker_dict_path = speaker_dict_path
 
     return config

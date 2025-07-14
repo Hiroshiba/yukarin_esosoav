@@ -15,6 +15,7 @@ class DataFileConfig(BaseModel):
     feature_variable_pathlist_path: Path
     target_vector_pathlist_path: Path
     target_scalar_pathlist_path: Path
+    speaker_dict_path: Path
     root_dir: Path | None
 
 
@@ -35,6 +36,8 @@ class NetworkConfig(BaseModel):
     feature_variable_size: int
     hidden_size: int
     target_vector_size: int
+    speaker_size: int
+    speaker_embedding_size: int
 
 
 class ModelConfig(BaseModel):
