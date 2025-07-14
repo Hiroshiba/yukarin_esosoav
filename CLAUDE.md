@@ -10,11 +10,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 設定管理
 - `src/hiho_pytorch_base/config.py`: Pydantic BaseModelベースの設定管理
-  - `DatasetFileConfig`: ファイルパス設定（feature_vector_pathlist_path、feature_variable_pathlist_path、target_vector_pathlist_path、target_scalar_pathlist_path、root_dir）
+  - `DataFileConfig`: ファイルパス設定（feature_vector_pathlist_path、feature_variable_pathlist_path、target_vector_pathlist_path、target_scalar_pathlist_path、speaker_dict_path、root_dir）
   - `DatasetConfig`: データセット設定（train_file、valid_file、test_num等）
-  - `NetworkConfig`: ネットワーク設定（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
+  - `NetworkConfig`: ネットワーク設定（feature_vector_size、feature_variable_size、hidden_size、target_vector_size、speaker_size、speaker_embedding_size）
   - `ModelConfig`: モデル設定（実装は空のプレースホルダー）
-  - `TrainConfig`: 学習設定（batch_size、optimizer、use_gpu等）
+  - `TrainConfig`: 学習設定（batch_size、optimizer、scheduler、use_gpu等）
   - `ProjectConfig`: プロジェクト設定（name、tags、category）
 
 ### 学習システム
@@ -115,6 +115,8 @@ network:
   feature_variable_size: 64
   hidden_size: 256
   target_vector_size: 10
+  speaker_size: 10
+  speaker_embedding_size: 16
 
 model: {}
 
@@ -129,7 +131,9 @@ train:
   optimizer:
     name: "adam"
     lr: 0.001
-  scheduler: null
+  scheduler:
+    name: "warmup"
+    warmup_steps: 100
   num_processes: 4
   use_gpu: true
   use_amp: true
@@ -257,17 +261,39 @@ project:
     - docs/memo.mdにパスリストの設計仕様を詳細に記載
     - 全テスト通過確認（7テスト）
 
+## Docker設計思想
+
+このプロジェクトのDockerfileは、実行環境の提供に特化した設計を採用しています：
+
+- **環境のみ提供**: Dockerfileは依存関係とライブラリのインストールのみを行い、学習コードや推論コードは含みません
+- **Git Clone前提**: 実際の利用時は、コンテナ内でGit cloneを実行してコードを取得することを想定しています
+- **最新依存関係**: 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）に準拠し、最新のCUDA/PyTorchベースイメージを使用
+- **音声処理対応**: libsoundfile1-dev、libasound2-dev等の音声処理ライブラリの整備方法をコメント等で案内
+- **UV使用**: pyproject.tomlベースの依存関係管理にUVを使用し、高速なパッケージインストールを実現
+
+### 使用例
+```bash
+# コンテナ起動
+docker build -t hiho-pytorch-base .
+docker run -it --gpus all hiho-pytorch-base
+
+# コンテナ内での作業
+git clone https://github.com/your-username/your-project.git
+cd your-project
+uv run python train.py config.yaml output/
+```
+
 ## 今後の作業
 
-1. **Docker更新**: Dockerfileを最新のPyTorchベースイメージに更新
-2. **HDF5対応**: accent_estimatorのようなHDF5データセット対応
-3. **話者IDマッピング**: 多話者学習対応
+1. **HDF5対応**: accent_estimatorのようなHDF5データセット対応
+2. **話者IDマッピング**: 多話者学習対応
 
 ## 開発ガイドライン
 
 ### 参考プロジェクト
 - `../yukarin_sosoa`、`../yukarin_sosfd`、`../accent_estimator`のコードを参考にする
 - これらのプロジェクトのどれかに実装があれば、それを真似するようにする
+- **例外**: スケジューラーの実行タイミングは参照プロジェクトと異なり、エポックベースを採用
 
 ### コーディング規約
 - **フォーマッター**: ruffを使用する
@@ -292,9 +318,12 @@ project:
 
 ## 注意事項
 
-- **NetworkConfig**: マルチタスク学習対応で実装済み（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
+- **NetworkConfig**: マルチタスク学習・多話者学習対応で実装済み（feature_vector_size、feature_variable_size、hidden_size、target_vector_size、speaker_size、speaker_embedding_size）
 - **ModelConfig**: 現在プレースホルダーのため、実際のモデル設定が必要です
 - **学習システム**: pytorch-trainerは削除され、新しいtrain.pyでネイティブPyTorch学習ループが動作します
 - **データ構造**: dataclassベースのマルチタイプデータ（feature_vector, feature_variable, target_vector, target_scalar）を使用
 - **ディレクトリ構造**: データタイプ別ディレクトリに同一ファイル名（ステムベース）で保存する方式を採用
 - **パスリスト**: root_dirからの相対パス形式（`feature_vector/0.npy`等）でファイルパスを管理
+- **スケジューラー**: エポックベースで実行（参照プロジェクトはイテレーションベース）
+  - WarmupLRスケジューラーの`warmup_steps`はエポック数として解釈される
+  - 設定例: `warmup_steps: 100`（100エポック）

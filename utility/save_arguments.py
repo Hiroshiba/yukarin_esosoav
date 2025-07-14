@@ -17,7 +17,7 @@ yaml.SafeDumper.add_representer(WindowsPath, _path_represent)
 
 
 def save_arguments(path: Path, target_function: Callable, arguments: dict[str, Any]):
-    """対象関数の引数のみを抽出してYAMLファイルに保存"""
+    """対象関数の引数を抽出してYAMLファイルに保存する"""
     args = inspect.getfullargspec(target_function).args
     obj = {k: v for k, v in arguments.items() if k in args}
 
