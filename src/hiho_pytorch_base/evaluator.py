@@ -1,4 +1,4 @@
-"""モデル評価モジュール"""
+"""評価値計算モジュール"""
 
 from dataclasses import dataclass
 
@@ -12,19 +12,19 @@ from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 @dataclass
 class EvaluatorOutput(DataNumProtocol):
-    """評価時の出力。特に含まないといけない値はない"""
+    """評価値"""
 
     loss: Tensor
     accuracy: Tensor
 
 
 def calculate_value(output: EvaluatorOutput) -> Tensor:
-    """評価値を計算する関数。高いほど良い。"""
+    """評価値の良し悪しを計算する関数。高いほど良い。"""
     return output.accuracy
 
 
 class Evaluator(nn.Module):
-    """モデルの評価を行うクラス"""
+    """評価値を計算するクラス"""
 
     def __init__(self, generator: Generator):
         super().__init__()
@@ -32,7 +32,7 @@ class Evaluator(nn.Module):
 
     @torch.no_grad()
     def forward(self, batch: BatchOutput) -> EvaluatorOutput:
-        """バッチデータを用いて評価結果を返す"""
+        """データをネットワークに入力して評価値を計算する"""
         feature_vector = batch.feature_vector
         feature_variable_list = batch.feature_variable_list
         target = batch.target_vector

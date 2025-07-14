@@ -16,15 +16,21 @@ def setup_test_environment() -> None:
 
 
 @pytest.fixture(scope="session")
-def base_config_path() -> Path:
+def test_data_dir() -> Path:
+    """テストデータディレクトリのパス"""
+    return Path(__file__).parent / "data"
+
+
+@pytest.fixture(scope="session")
+def base_config_path(test_data_dir: Path) -> Path:
     """ベース設定ファイルのパス"""
-    return Path(__file__).parent / "data" / "base_config.yaml"
+    return test_data_dir / "base_config.yaml"
 
 
 @pytest.fixture(scope="session", autouse=True)
-def data_and_config(base_config_path: Path) -> Config:
+def data_and_config(base_config_path: Path, test_data_dir: Path) -> Config:
     """データディレクトリと学習テスト用の設定のセットアップ"""
-    data_dir = Path(__file__).parent / "data" / "data"
+    data_dir = test_data_dir / "data"
     return setup_data_and_config(base_config_path, data_dir)
 
 
@@ -35,8 +41,8 @@ def train_config(data_and_config: Config) -> Config:
 
 
 @pytest.fixture(scope="session")
-def train_output_dir() -> Path:
+def train_output_dir(test_data_dir: Path) -> Path:
     """学習結果ディレクトリのパス"""
-    output_dir = Path(__file__).parent / "data" / "train_output"
+    output_dir = test_data_dir / "train_output"
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir

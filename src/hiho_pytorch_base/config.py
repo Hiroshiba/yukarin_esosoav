@@ -1,4 +1,4 @@
-"""機械学習プロジェクトの設定管理モジュール"""
+"""機械学習プロジェクトの設定モジュール"""
 
 from pathlib import Path
 from typing import Any, Self
@@ -8,28 +8,28 @@ from pydantic import BaseModel, Field
 from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
 
 
-class DatasetFileConfig(BaseModel):
-    """データセットファイルパスの設定"""
+class DataFileConfig(BaseModel):
+    """データファイルの設定"""
 
     feature_vector_pathlist_path: Path
     feature_variable_pathlist_path: Path
     target_vector_pathlist_path: Path
     target_scalar_pathlist_path: Path
-    root_dir: Path
+    root_dir: Path | None
 
 
 class DatasetConfig(BaseModel):
     """データセット全体の設定"""
 
-    train: DatasetFileConfig
-    valid: DatasetFileConfig | None = None
+    train: DataFileConfig
+    valid: DataFileConfig | None = None
     test_num: int
     eval_times_num: int = 1
     seed: int = 0
 
 
 class NetworkConfig(BaseModel):
-    """ニューラルネットワーク構造の設定"""
+    """ニューラルネットワークの設定"""
 
     feature_vector_size: int
     feature_variable_size: int
@@ -38,13 +38,13 @@ class NetworkConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    """モデル固有の設定"""
+    """モデルの設定"""
 
     pass
 
 
 class TrainConfig(BaseModel):
-    """学習パラメータの設定"""
+    """学習の設定"""
 
     batch_size: int
     eval_batch_size: int
@@ -63,7 +63,7 @@ class TrainConfig(BaseModel):
 
 
 class ProjectConfig(BaseModel):
-    """プロジェクト情報の設定"""
+    """プロジェクトの設定"""
 
     name: str
     tags: dict[str, Any] = Field(default_factory=dict)
@@ -71,7 +71,7 @@ class ProjectConfig(BaseModel):
 
 
 class Config(BaseModel):
-    """機械学習プロジェクトの全設定"""
+    """機械学習の全設定"""
 
     dataset: DatasetConfig
     network: NetworkConfig
@@ -86,7 +86,7 @@ class Config(BaseModel):
         return cls.model_validate(d)
 
     def to_dict(self) -> dict[str, Any]:
-        """設定オブジェクトを辞書に変換"""
+        """辞書に変換"""
         return self.model_dump(mode="json")
 
     def validate_config(self) -> None:

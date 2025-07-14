@@ -1,4 +1,4 @@
-"""PyTorch関連ユーティリティ関数群"""
+"""PyTorch関連ユーティリティ"""
 
 from collections.abc import Callable
 from copy import deepcopy

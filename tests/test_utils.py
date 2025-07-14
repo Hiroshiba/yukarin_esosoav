@@ -1,4 +1,4 @@
-"""テストユーティリティ - シンプルなテストデータ生成"""
+"""テストの便利モジュール"""
 
 from collections.abc import Callable
 from pathlib import Path
@@ -10,7 +10,7 @@ from hiho_pytorch_base.config import Config
 
 
 def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
-    """テストデータをセットアップして設定を作る"""
+    """テストデータをセットアップし、設定を作る"""
     with base_config_path.open() as f:
         config_dict = yaml.safe_load(f)
 

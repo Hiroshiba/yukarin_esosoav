@@ -15,7 +15,7 @@ TensorLike = Tensor | numpy.ndarray
 
 @dataclass
 class GeneratorOutput:
-    """推論結果のデータ構造"""
+    """生成したデータ"""
 
     vector_output: Tensor
     scalar_output: Tensor

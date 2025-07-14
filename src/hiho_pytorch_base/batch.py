@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor
 
-from hiho_pytorch_base.dataset import DatasetOutput
+from hiho_pytorch_base.data.data import OutputData
 
 
 @dataclass
@@ -19,7 +19,7 @@ class BatchOutput:
 
     @property
     def data_num(self) -> int:
-        """バッチサイズ（データ数）を返す"""
+        """バッチサイズを返す"""
         return self.feature_vector.shape[0]
 
 
@@ -33,9 +33,9 @@ def collate_list(values: list[Tensor]) -> list[Tensor]:
     return values  # TODO: ここでpadする？datasetからmaskを受け取る形で
 
 
-def collate_dataset_output(data_list: list[DatasetOutput]) -> BatchOutput:
+def collate_dataset_output(data_list: list[OutputData]) -> BatchOutput:
     """DatasetOutputのリストをBatchOutputに変換"""
-    if not data_list:
+    if len(data_list) == 0:
         raise ValueError("batch is empty")
 
     return BatchOutput(

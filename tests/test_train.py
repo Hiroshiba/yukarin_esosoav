@@ -18,14 +18,19 @@ from scripts.generate import generate
 from train import train
 
 
-def pytest_collection_modifyitems(items):
-    """end-to-endテストの実行順序を制御（train → generate）"""
-    e2e_train = [i for i in items if "e2e_train" in i.name]
-    e2e_generate = [i for i in items if "e2e_generate" in i.name]
-    others = [i for i in items if "e2e" not in i.name]
+def pytest_collection_modifyitems(items: list[pytest.Item]):
+    """end-to-endテストの実行順序を制御し、生成テストの前に学習テストを配置する。"""
 
-    # 実行順序: その他のテスト → e2e_train → e2e_generate
-    items[:] = others + e2e_train + e2e_generate
+    def get_sort_key(item: pytest.Item) -> int:
+        match item.name:
+            case name if "e2e_train" in name:
+                return 1
+            case name if "e2e_generate" in name:
+                return 2
+            case _:
+                return 0
+
+    items.sort(key=get_sort_key)
 
 
 def test_dataset_creation(train_config: Config) -> None:
@@ -48,7 +53,7 @@ def test_model_creation(train_config: Config) -> None:
 
 
 def test_e2e_train(train_config: Config, train_output_dir: Path) -> None:
-    """学習の統合テスト - 学習実行と結果ファイルの生成確認"""
+    """学習のe2eテスト"""
     output_dir = train_output_dir / "trained_model"
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -68,7 +73,7 @@ def test_e2e_train(train_config: Config, train_output_dir: Path) -> None:
 
 
 def test_e2e_generate(train_output_dir: Path, tmp_path: Path) -> None:
-    """推論の統合テスト - 学習済みモデルを使用した推論実行"""
+    """生成のe2eテスト"""
     trained_model_dir = train_output_dir / "trained_model"
     if not trained_model_dir.exists():
         pytest.fail("train test not completed yet")

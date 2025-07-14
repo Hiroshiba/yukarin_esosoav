@@ -1,4 +1,4 @@
-"""モデル定義モジュール"""
+"""モデルのモジュール。ネットワークの出力からLossを計算する。"""
 
 from dataclasses import dataclass
 
@@ -33,7 +33,7 @@ def accuracy(output: Tensor, target: Tensor) -> Tensor:
 
 
 class Model(nn.Module):
-    """学習用のモデルクラス"""
+    """学習モデルクラス"""
 
     def __init__(self, model_config: ModelConfig, predictor: Predictor):
         super().__init__()
@@ -41,7 +41,7 @@ class Model(nn.Module):
         self.predictor = predictor
 
     def forward(self, batch: BatchOutput) -> ModelOutput:
-        """ネットワークに入力して損失などを計算する"""
+        """データをネットワークに入力して損失などを計算する"""
         vector_output, scalar_output = self.predictor(
             feature_vector=batch.feature_vector,
             feature_variable_list=batch.feature_variable_list,

@@ -34,7 +34,7 @@ from hiho_pytorch_base.utility.train_utility import Logger, SaveManager, reduce_
 
 @dataclass
 class TrainingResults:
-    """学習結果を格納するデータクラス"""
+    """学習結果"""
 
     train: ModelOutput
 
@@ -45,7 +45,7 @@ class TrainingResults:
 
 @dataclass
 class EvaluationResults:
-    """評価結果を格納するデータクラス"""
+    """評価結果"""
 
     test: ModelOutput
     eval: EvaluatorOutput
@@ -64,7 +64,7 @@ class EvaluationResults:
 
 @dataclass
 class TrainingContext:
-    """学習に必要な全てのオブジェクトをまとめるデータクラス"""
+    """学習に必要な全てのオブジェクトをまとめる"""
 
     config: Config
     train_loader: DataLoader
@@ -103,7 +103,7 @@ def create_data_loader(
 
 
 def setup_training_context(config_yaml_path: Path, output_dir: Path) -> TrainingContext:
-    """学習に必要な全てのオブジェクトを初期化してTrainingContextを作成"""
+    """TrainingContextを作成"""
     # config
     with config_yaml_path.open() as f:
         config_dict = yaml.safe_load(f)
@@ -205,7 +205,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
 
 def load_snapshot(context: TrainingContext) -> None:
-    """スナップショットを読み込んで学習状態を復元"""
+    """学習状態を復元"""
     snapshot = torch.load(context.snapshot_path, map_location=context.device)
 
     context.model.load_state_dict(snapshot["model"])
@@ -221,7 +221,7 @@ def load_snapshot(context: TrainingContext) -> None:
 
 
 def train_one_epoch(context: TrainingContext) -> TrainingResults:
-    """1エポックの学習処理"""
+    """１エポックの学習処理"""
     context.model.train()
 
     train_results: list[ModelOutput] = []
@@ -251,7 +251,7 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
 
 @torch.no_grad()
 def evaluate(context: TrainingContext) -> EvaluationResults:
-    """test/eval/validの評価"""
+    """評価値を計算する"""
     context.model.eval()
 
     # test評価
@@ -286,7 +286,7 @@ def evaluate(context: TrainingContext) -> EvaluationResults:
 def save_predictor(
     context: TrainingContext, evaluation_results: EvaluationResults
 ) -> None:
-    """評価結果に基づいてpredictorを保存"""
+    """評価結果に基づいてPredictorを保存する"""
     if evaluation_results.valid is not None:
         evaluation_value = calculate_value(evaluation_results.valid).item()
     else:
@@ -296,7 +296,7 @@ def save_predictor(
 
 
 def save_checkpoint(context: TrainingContext) -> None:
-    """チェックポイント保存"""
+    """チェックポイント保存する"""
     torch.save(
         {
             "model": context.model.state_dict(),
@@ -311,17 +311,17 @@ def save_checkpoint(context: TrainingContext) -> None:
 
 
 def should_log_epoch(context: TrainingContext) -> bool:
-    """ログ出力判定"""
+    """ログ出力するかどうか判定する"""
     return context.epoch % context.config.train.log_epoch == 0
 
 
 def should_eval_epoch(context: TrainingContext) -> bool:
-    """評価実行判定"""
+    """評価実行するかどうか判定する"""
     return context.epoch % context.config.train.eval_epoch == 0
 
 
 def should_snapshot_epoch(context: TrainingContext) -> bool:
-    """スナップショット保存判定"""
+    """スナップショット保存するかどうか判定する"""
     return context.epoch % context.config.train.snapshot_epoch == 0
 
 
@@ -353,7 +353,7 @@ def training_loop(context: TrainingContext) -> None:
 
 
 def train(config_yaml_path: Path, output_dir: Path) -> None:
-    """設定ファイルに基づいて機械学習モデルを学習"""
+    """機械学習モデルを学習する。スナップショットがあれば再開する。"""
     context = setup_training_context(config_yaml_path, output_dir)
 
     if context.snapshot_path.exists():

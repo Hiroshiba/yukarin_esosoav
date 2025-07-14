@@ -1,9 +1,9 @@
-"""学習用ユーティリティ関数群"""
+"""学習用ユーティリティ"""
 
 import math
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal
 
 import torch
 
@@ -15,11 +15,8 @@ class DataNumProtocol:
     data_num: int
 
 
-T = TypeVar("T", bound=DataNumProtocol)
-
-
 @torch.no_grad()
-def reduce_result(results: list[T]) -> T:
+def reduce_result[T: DataNumProtocol](results: list[T]) -> T:
     """結果をデータ数で重み付けして統計"""
     if not results:
         raise ValueError("results cannot be empty")
@@ -57,7 +54,7 @@ def _flatten_dict(dd, separator="/", prefix=""):
 
 
 class Logger:
-    """TensorBoardとW&Bを統合した学習ログシステム"""
+    """TensorBoardとW&Bを統合したロガー"""
 
     def __init__(
         self,
@@ -134,7 +131,7 @@ class Logger:
 
 
 class SaveManager:
-    """モデルの保存を管理するクラス（最良モデルと最新モデルを保持）"""
+    """ネットワークの保存を管理するクラス。最良と最新を保持する。"""
 
     def __init__(
         self,
@@ -154,7 +151,7 @@ class SaveManager:
         self.top_step_values: list[tuple[int, float]] = []
 
     def save(self, value: float, step: int, judge: Literal["min", "max"]):
-        """モデルを保存し、最良モデルと最新モデルを管理"""
+        """最良と最新を管理"""
         if math.isnan(value):
             return
 
@@ -199,7 +196,7 @@ class SaveManager:
                 delete_path.unlink()
 
     def state_dict(self):
-        """セーブマネージャーの状態辞書を取得"""
+        """保存管理の状態を取得"""
         state_dict = {
             "last_steps": self.last_steps,
             "top_step_values": self.top_step_values,
@@ -207,6 +204,6 @@ class SaveManager:
         return state_dict
 
     def load_state_dict(self, state_dict):
-        """セーブマネージャーの状態を復元"""
+        """保存管理の状態を復元"""
         self.last_steps = state_dict["last_steps"]
         self.top_step_values = state_dict["top_step_values"]

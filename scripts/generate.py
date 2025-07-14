@@ -1,4 +1,4 @@
-"""学習済みモデルからの推論・生成スクリプト"""
+"""学習済みモデルを用いた生成スクリプト"""
 
 import argparse
 import re
@@ -8,7 +8,7 @@ import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from hiho_pytorch_base.batch import collate_dataset_output
+from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.generator import Generator
@@ -40,7 +40,7 @@ def generate(
     output_dir: Path,
     use_gpu: bool,
 ):
-    """学習済みモデルを使用して推論を実行"""
+    """設定にあるデータセットから生成する"""
     if predictor_path is None and model_dir is not None:
         predictor_path = _get_predictor_model_path(
             model_dir=model_dir, iteration=predictor_iteration
@@ -68,11 +68,12 @@ def generate(
     dataset = create_dataset(config.dataset).test
     data_loader = DataLoader(
         dataset=dataset,
-        batch_size=1,  # 推論では1つずつ処理
+        batch_size=1,
         shuffle=False,
         collate_fn=collate_dataset_output,
     )
 
+    batch: BatchOutput
     for batch in tqdm(data_loader, desc="generate"):
         _ = generator(
             feature_vector=batch.feature_vector,

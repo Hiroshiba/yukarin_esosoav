@@ -111,10 +111,10 @@ dataset:
   seed: 0
 
 network:
-  feature_vector_size: 128    # 固定長特徴ベクトルのサイズ
-  feature_variable_size: 64   # 可変長特徴の次元数
-  hidden_size: 256            # 隠れ層のサイズ
-  target_vector_size: 10      # 分類クラス数（ベクトル出力サイズ）
+  feature_vector_size: 128
+  feature_variable_size: 64
+  hidden_size: 256
+  target_vector_size: 10
 
 model: {}
 
