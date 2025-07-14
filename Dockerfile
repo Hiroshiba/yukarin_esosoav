@@ -19,4 +19,4 @@ WORKDIR /app
 # install requirements
 COPY --from=ghcr.io/astral-sh/uv:0.6.14 /uv /uvx /bin/
 COPY pyproject.toml uv.lock /app/
-RUN uv sync
+RUN uv sync --no-install-project
