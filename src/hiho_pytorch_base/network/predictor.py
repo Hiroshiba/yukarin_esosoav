@@ -1,4 +1,4 @@
-"""予測器ネットワークの実装"""
+"""メインのネットワークモジュール"""
 
 import torch
 from torch import Tensor, nn
@@ -36,14 +36,13 @@ class Predictor(nn.Module):
 
         self.scalar_head = nn.Linear(hidden_size, 1)
 
-    def forward(
+    def forward(  # noqa: D102
         self,
         *,
         feature_vector: Tensor,
         feature_variable_list: list[Tensor],
         speaker_id: Tensor,
     ) -> tuple[Tensor, Tensor]:
-        """メインの処理"""
         variable_means = []
         for var_data in feature_variable_list:
             var_mean = torch.mean(var_data, dim=0)

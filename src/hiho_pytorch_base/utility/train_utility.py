@@ -110,12 +110,12 @@ class Logger:
         print(f"Step: {step}, {flattern_summary}")
 
     def state_dict(self):
-        """ロガーの状態辞書を取得"""
+        """状態を取得"""
         state_dict = {"wandb_id": self.wandb_id}
         return state_dict
 
     def load_state_dict(self, state_dict):
-        """ロガーの状態を復元"""
+        """状態を復元"""
         self.wandb_id = state_dict["wandb_id"]
 
     def close(self):
@@ -195,7 +195,7 @@ class SaveManager:
                 delete_path.unlink()
 
     def state_dict(self):
-        """保存管理の状態を取得"""
+        """状態を取得"""
         state_dict = {
             "last_steps": self.last_steps,
             "top_step_values": self.top_step_values,
@@ -203,6 +203,6 @@ class SaveManager:
         return state_dict
 
     def load_state_dict(self, state_dict):
-        """保存管理の状態を復元"""
+        """状態を復元"""
         self.last_steps = state_dict["last_steps"]
         self.top_step_values = state_dict["top_step_values"]
