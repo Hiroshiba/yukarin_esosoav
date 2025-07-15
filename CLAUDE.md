@@ -75,7 +75,7 @@ PYTHONPATH=. uv run python scripts/generate.py --model_dir <model_dir> --output_
 
 ### テスト実行
 ```bash
-uv run pytest tests/
+uv run pytest tests/ -sv
 ```
 
 ### 開発環境セットアップ

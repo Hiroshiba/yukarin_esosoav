@@ -1,4 +1,4 @@
-"""モデルのモジュール。ネットワークの出力からLossを計算する。"""
+"""モデルのモジュール。ネットワークの出力から損失を計算する。"""
 
 from dataclasses import dataclass
 
@@ -14,7 +14,7 @@ from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 @dataclass
 class ModelOutput(DataNumProtocol):
-    """学習時のモデルの出力。Lossと、イテレーション毎に計算したい値を含む"""
+    """学習時のモデルの出力。損失と、イテレーション毎に計算したい値を含む"""
 
     loss: Tensor
     """逆伝播させる損失"""
@@ -24,11 +24,14 @@ class ModelOutput(DataNumProtocol):
     accuracy: Tensor
 
 
-def accuracy(output: Tensor, target: Tensor) -> Tensor:
+def accuracy(
+    output: Tensor,  # (B, ?)
+    target: Tensor,  # (B,)
+) -> Tensor:
     """分類精度を計算"""
     with torch.no_grad():
-        indexes = torch.argmax(output, dim=1)
-        correct = torch.eq(indexes, target).view(-1)
+        indexes = torch.argmax(output, dim=1)  # (B,)
+        correct = torch.eq(indexes, target).view(-1)  # (B,)
         return correct.float().mean()
 
 
@@ -42,14 +45,17 @@ class Model(nn.Module):
 
     def forward(self, batch: BatchOutput) -> ModelOutput:
         """データをネットワークに入力して損失などを計算する"""
-        vector_output, scalar_output = self.predictor(
+        (
+            vector_output,  # (B, ?)
+            scalar_output,  # (B,)
+        ) = self.predictor(
             feature_vector=batch.feature_vector,
             feature_variable_list=batch.feature_variable_list,
             speaker_id=batch.speaker_id,
         )
 
-        target_vector = batch.target_vector
-        target_scalar = batch.target_scalar
+        target_vector = batch.target_vector  # (B,)
+        target_scalar = batch.target_scalar  # (B,)
 
         loss_vector = cross_entropy(vector_output, target_vector)
         loss_scalar = mse_loss(scalar_output, target_scalar)

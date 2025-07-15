@@ -39,26 +39,28 @@ class Predictor(nn.Module):
     def forward(  # noqa: D102
         self,
         *,
-        feature_vector: Tensor,
-        feature_variable_list: list[Tensor],
-        speaker_id: Tensor,
-    ) -> tuple[Tensor, Tensor]:
+        feature_vector: Tensor,  # (B, ?)
+        feature_variable_list: list[Tensor],  # [(vL, ?)]
+        speaker_id: Tensor,  # (B,)
+    ) -> tuple[Tensor, Tensor]:  # (B, ?), (B,)
         variable_means = []
-        for var_data in feature_variable_list:
-            var_mean = torch.mean(var_data, dim=0)
-            var_processed = self.variable_processor(var_mean)
+        for var_data in feature_variable_list:  # (vL, ?)
+            var_mean = torch.mean(var_data, dim=0)  # (?)
+            var_processed = self.variable_processor(var_mean)  # (?)
             variable_means.append(var_processed)
 
-        variable_features = torch.stack(variable_means)
-        combined_features = feature_vector + variable_features
+        variable_features = torch.stack(variable_means)  # (B, ?)
+        combined_features = feature_vector + variable_features  # (B, ?)
 
-        speaker_embedding = self.speaker_embedder(speaker_id)
-        final_features = torch.cat([combined_features, speaker_embedding], dim=1)
+        speaker_embedding = self.speaker_embedder(speaker_id)  # (B, ?)
+        final_features = torch.cat(
+            [combined_features, speaker_embedding], dim=1
+        )  # (B, ?)
 
-        hidden = self.main_layers(final_features)
+        hidden = self.main_layers(final_features)  # (B, ?)
 
-        vector_output = self.vector_head(hidden)
-        scalar_output = self.scalar_head(hidden).squeeze(-1)
+        vector_output = self.vector_head(hidden)  # (B, ?)
+        scalar_output = self.scalar_head(hidden).squeeze(-1)  # (B,)
 
         return vector_output, scalar_output
 
