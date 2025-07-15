@@ -62,7 +62,7 @@ PYTHONPATH=. uv run python scripts/generate.py --model_dir <model_dir> --output_
 
 ### テスト実行
 ```bash
-uv run pytest tests/
+uv run pytest tests/ -sv
 ```
 
 ### 開発環境セットアップ
@@ -184,6 +184,7 @@ data/
 - **型アノテーション**: 全ての関数で必須
 - **デフォルト値**: 原則として関数引数にデフォルト値を設定しない
 - **キーワード引数**: ネットワークのforward methodではキーワード引数のみを使用
+- **コメント**: 最小限にし、自明なコメントは避ける
 
 ### データ設計
 - **ステムベース対応**: 同じサンプルのファイルは拡張子を除いて同じ名前

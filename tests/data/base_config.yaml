@@ -22,6 +22,11 @@ network:
   feature_variable_size: 32
   hidden_size: 32
   target_vector_size: 3
+  conformer_layers: 1
+  conformer_heads: 2
+  conformer_ff_dim: 32
+  conformer_kernel_size: 3
+  conformer_dropout: 0.0
   speaker_size: 3
   speaker_embedding_size: 8
 
