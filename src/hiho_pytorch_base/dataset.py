@@ -162,7 +162,6 @@ class DatasetCollection:
 def create_dataset(config: DatasetConfig) -> DatasetCollection:
     """データセットを作成"""
     # TODO: accent_estimatorのようにHDF5に対応させ、docs/にドキュメントを書く
-    # TODO: 話者IDのマッピングに対応させる
     datas = get_datas(config.train)
 
     if config.seed is not None:
