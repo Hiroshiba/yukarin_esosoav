@@ -7,11 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import Dataset as BaseDataset
 from torch.utils.data._utils.collate import default_convert
 
 from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
 from hiho_pytorch_base.data.data import InputData, preprocess
+from hiho_pytorch_base.data.sampling_data import SamplingData
 
 
 @dataclass
@@ -25,11 +26,11 @@ class LazyInputData:
     speaker_id: int
 
     def generate(self) -> InputData:
-        """ファイルからデータを読み込んでDatasetInputを生成"""
+        """ファイルからデータを読み込んでInputDataを生成"""
         return InputData(
             feature_vector=numpy.load(self.feature_vector_path, allow_pickle=True),
             feature_variable=numpy.load(self.feature_variable_path, allow_pickle=True),
-            target_vector=numpy.load(self.target_vector_path, allow_pickle=True),
+            target_vector=SamplingData.load(self.target_vector_path),
             target_scalar=float(numpy.load(self.target_scalar_path, allow_pickle=True)),
             speaker_id=self.speaker_id,
         )
@@ -118,15 +119,17 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
     return datas
 
 
-class FeatureDataset(Dataset):
+class Dataset(BaseDataset):
     """メインのデータセット"""
 
     def __init__(
         self,
-        datas: Sequence[InputData | LazyInputData],
+        datas: Sequence[LazyInputData],
+        config: DatasetConfig,
         is_eval: bool,
     ):
         self.datas = datas
+        self.config = config
         self.is_eval = is_eval
 
     def __len__(self):
@@ -139,7 +142,7 @@ class FeatureDataset(Dataset):
         if isinstance(data, LazyInputData):
             data = data.generate()
 
-        return default_convert(preprocess(data, is_eval=self.is_eval))
+        return default_convert(preprocess(data, self.config, is_eval=self.is_eval))
 
 
 @dataclass
@@ -170,9 +173,9 @@ def create_dataset(config: DatasetConfig) -> DatasetCollection:
     tests, trains = datas[: config.test_num], datas[config.test_num :]
 
     def _wrapper(datas: list[LazyInputData], is_eval: bool) -> Dataset:
-        dataset = FeatureDataset(datas=datas, is_eval=is_eval)
         if is_eval:
-            dataset = ConcatDataset([dataset] * config.eval_times_num)
+            datas = datas * config.eval_times_num
+        dataset = Dataset(datas=datas, config=config, is_eval=is_eval)
         return dataset
 
     return DatasetCollection(

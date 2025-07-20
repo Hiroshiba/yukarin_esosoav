@@ -8,6 +8,7 @@ import numpy as np
 import yaml
 
 from hiho_pytorch_base.config import Config
+from hiho_pytorch_base.data.sampling_data import SamplingData
 
 
 def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
@@ -67,12 +68,14 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
 
     _setup_data(generate_feature_variable, "feature_variable", "npy")
 
-    # クラス分類
+    # サンプリングデータ
     def generate_target_vector(file_path: Path) -> None:
-        target_class = np.random.randint(
-            0, config.network.target_vector_size, dtype=np.int64
+        array_length = config.dataset.frame_length
+        array = np.random.randint(
+            0, config.network.target_vector_size, array_length, dtype=np.int64
         )
-        np.save(file_path, target_class)
+        sampling_data = SamplingData(array=array, rate=config.dataset.frame_rate)
+        sampling_data.save(file_path)
 
     _setup_data(generate_target_vector, "target_vector", "npy")
 

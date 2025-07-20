@@ -16,6 +16,8 @@ dataset:
   test_num: 16
   eval_times_num: 1
   seed: 42
+  frame_rate: 10.0
+  frame_length: 50
 
 network:
   feature_vector_size: 16
