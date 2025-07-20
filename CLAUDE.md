@@ -91,56 +91,7 @@ uv run ruff format
 
 ## 設定ファイル形式
 
-YAML形式で設定を管理：
-```yaml
-dataset:
-  train:
-    feature_vector_pathlist_path: "/path/to/feature_vector_pathlist.txt"
-    feature_variable_pathlist_path: "/path/to/feature_variable_pathlist.txt"
-    target_vector_pathlist_path: "/path/to/target_vector_pathlist.txt"
-    target_scalar_pathlist_path: "/path/to/target_scalar_pathlist.txt"
-    root_dir: "/path/to/data"
-  valid:  # optional
-    feature_vector_pathlist_path: "/path/to/valid/feature_vector_pathlist.txt"
-    feature_variable_pathlist_path: "/path/to/valid/feature_variable_pathlist.txt"
-    target_vector_pathlist_path: "/path/to/valid/target_vector_pathlist.txt"
-    target_scalar_pathlist_path: "/path/to/valid/target_scalar_pathlist.txt"
-    root_dir: "/path/to/valid_data"
-  test_num: 100
-  eval_times_num: 1
-  seed: 0
-
-network:
-  feature_vector_size: 128
-  feature_variable_size: 64
-  hidden_size: 256
-  target_vector_size: 10
-  speaker_size: 10
-  speaker_embedding_size: 16
-
-model: {}
-
-train:
-  batch_size: 100
-  eval_batch_size: 10
-  log_epoch: 1
-  eval_epoch: 10
-  snapshot_epoch: 100
-  stop_epoch: 1000
-  model_save_num: 5
-  optimizer:
-    name: "adam"
-    lr: 0.001
-  scheduler:
-    name: "warmup"
-    warmup_steps: 100
-  num_processes: 4
-  use_gpu: true
-  use_amp: true
-
-project:
-  name: null
-```
+YAML形式で設定を管理
 
 ## 現在の依存関係
 
@@ -158,108 +109,8 @@ project:
 - wandb>=0.21.0
 
 ### パッケージ管理
-- UVを使用してpyproject.tomlベースで依存関係を管理
+- uvを使用してpyproject.tomlベースで依存関係を管理
 - 最新バージョンの依存関係を使用（PyTorch 2.7.1等）
-
-## 完了した改善点
-
-1. ✅ **UV移行**: pyproject.tomlベースのパッケージ管理に移行完了
-2. ✅ **PyTorch更新**: PyTorch 2.7.1に更新完了
-3. ✅ **SRCレイアウト**: コードをsrc/hiho_pytorch_base/ディレクトリに移行完了
-4. ✅ **Ruff導入**: コードフォーマッターとリンターを導入
-5. ✅ **テストデータ生成**: テスト用データ生成コードとpytest fixtures作成完了
-6. ✅ **インポートパス更新（部分）**: config.py, dataset.py, trainer.py, model.py, network/predictor.pyで`library` → `hiho_pytorch_base`に更新完了
-7. ✅ **.gitignore更新**: GitHub公式Python用テンプレートベースに更新完了
-8. ✅ **dataset.py最新化**: yukarin_sosoa/sosfdを参考に全面的に更新完了
-   - pathlist方式への移行（glob方式から変更）
-   - DatasetFileConfig導入によるスケーラブルな設定管理
-   - DatasetOutput TypedDict化
-   - preprocess関数、_load_pathlist関数、get_datas関数追加
-   - バリデーションデータ対応（valid_file設定）
-   - typo修正（43行目input→data）
-9. ✅ **model.py最新化**: yukarin_sosoa/sosfdを参考に全面的に更新完了
-   - ModelOutput TypedDict化（loss、accuracy、data_num）
-   - reduce_result関数追加（辞書アクセス対応）
-   - self.tail問題解決（predictor直接使用に変更）
-   - pytorch_trainer依存削除
-   - DatasetOutput対応の forward method実装
-10. ✅ **generator.py最新化**: yukarin_sosoa/sosfdを参考に更新完了
-    - インポートパス修正（library → hiho_pytorch_base）
-    - GeneratorOutput クラス導入
-    - to_tensor関数追加
-    - nn.Module継承のGenerator実装
-    - generate/forward メソッド両対応
-11. ✅ **network/predictor.py最新化**: 基本的な実装を追加完了
-    - シンプルなMLP実装（3層のLinear + ReLU + Dropout）
-    - NetworkConfig対応のcreate_predictor関数
-    - デフォルトパラメータ設定（input_size=128、hidden_size=256、output_size=10）
-12. ✅ **evaluator.py新規作成**: model.pyのlossを評価指標にした実装完了
-    - EvaluatorOutput TypedDict化（value、loss、accuracy、data_num）
-    - Generator使用の評価システム
-    - cross_entropy loss計算とaccuracy計算
-    - judge プロパティ追加（"min"/"max"判定用）
-13. ✅ **trainer.py削除とtrain.py作成**: pytorch-trainer代替実装完了
-    - trainer.pyを削除（参照プロジェクト準拠）
-    - train.pyを参照プロジェクト（yukarin_sosoa）ベースで新規作成
-    - torch.amp（新しいPyTorch API）使用
-    - torch.jit.script による predictor 最適化
-    - datasets["eval"] 使用、valid_dataset None 対応
-    - evaluator.judge を使用した SaveManager 実装
-14. ✅ **utility モジュール実装**: 参照プロジェクト準拠で新規作成
-    - utility/train_utility.py（Logger、SaveManager）
-    - utility/pytorch_utility.py（make_optimizer、make_scheduler、collate_list、collate_dataclass等）
-    - 新しいPyTorch API対応（torch.amp、WarmupLR等）
-    - dataclassベースのcollateシステム実装
-15. ✅ **config.py エポックベース移行**: iteration → epoch ベースに更新完了
-    - TrainConfig を iteration ベースから epoch ベースに変更
-    - model_save_num、scheduler、pretrained_predictor_path 等フィールド追加
-    - 参照プロジェクト準拠の設定項目統一
-16. ✅ **torch_optimizer パッケージ追加**: uv add で依存関係追加完了
-    - torch-optimizer>=0.3.0 追加
-    - pytorch-ranger>=0.1.1 も自動インストール
-    - RAdam、Ranger等の最新オプティマイザ利用可能
-17. ✅ **型整合性修正**: 各種型エラー・実行時エラー対応完了
-    - Model コンストラクタ torch.jit.script 対応（nn.Module型に変更）
-    - valid_dataset None 対応処理追加
-    - target データ型修正（.float() → .long()、cross_entropy用）
-    - DatasetOutput/GeneratorOutput 型一貫性確保
-18. ✅ **インポートパス更新完了**: 全ファイルで`library` → `hiho_pytorch_base`への更新完了
-    - scripts/generate.py のインポートパス修正完了
-    - 残存していたlibraryインポートを全て修正
-19. ✅ **Pydantic設定システム移行**: dataclassからPydantic BaseModelへの移行完了
-    - pydantic>=2.11.7 依存関係追加
-    - 全configクラス（DatasetFileConfig、DatasetConfig、NetworkConfig等）をBaseModelに変更
-    - model_validate()、model_dump(mode="json")による適切なシリアライゼーション
-    - PathオブジェクトのYAML変換問題解決
-    - 全テスト通過確認
-20. ✅ **テストシステム復活**: train.pyベース実装に合わせたtest_train.py復活完了
-    - train.pyのtrain関数を直接テスト
-    - 実際の学習プロセス実行テスト（test_train_simple_epochs）
-    - TensorBoardログ、predictorモデル、snapshotファイル生成確認
-    - 全5テスト通過確認
-21. ✅ **dataclassベースcollateシステム実装**: TypedDictからdataclassへの移行完了
-    - DatasetOutput・BatchOutputをdataclass化（feature_vector、feature_variable、target_vector、target_scalar）
-    - 可変長データ対応（feature_variableをList[Tensor]として扱い）
-    - type annotation基づくcollate_dataclass関数実装
-    - マルチタスク学習対応（分類+回帰）のModel forward method実装
-22. ✅ **ディレクトリベースデータ管理への移行**: ステムベースファイル管理実装完了
-    - 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）パターン適用
-    - 7文字除去方式からステム（Path.stem）ベース対応付けに変更
-    - データタイプ別ディレクトリ構造（feature_vector/、feature_variable/、target_vector/、target_scalar/）
-    - テストデータ生成システムの簡略化（同一ファイル名で各ディレクトリに保存）
-    - pathlistファイル生成・テストコードの新構造対応
-23. ✅ **NetworkConfigリファクタリング**: パラメーター名の分かりやすさとコード整理完了
-    - パラメーター名変更（input_size→feature_vector_size、variable_feature_size→feature_variable_size、vector_output_size→target_vector_size）
-    - 使われていないoutput_sizeパラメーターを削除
-    - Predictorクラスから不要なプロパティ保存を削除（ネットワーク構築にのみ使用）
-    - 引数順序を論理的に整理（feature_vector_size、feature_variable_size、hidden_size、target_vector_size）
-    - 関連ファイル（create_predictor関数、test_train.py、設定ファイル）の追従完了
-24. ✅ **パスリストバグ修正**: dataset.pyのTODO箇所を修正完了
-    - `get_data_paths`関数から不要な`/first_data_type`パスを削除
-    - pathlistファイルがroot_dirからの相対パス形式を正しく処理するよう修正
-    - テストユーティリティのpathlist生成を正しい形式（`feature_vector/0.npy`等）に更新
-    - docs/memo.mdにパスリストの設計仕様を詳細に記載
-    - 全テスト通過確認（7テスト）
 
 ## Docker設計思想
 
@@ -269,52 +120,16 @@ project:
 - **Git Clone前提**: 実際の利用時は、コンテナ内でGit cloneを実行してコードを取得することを想定しています
 - **最新依存関係**: 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）に準拠し、最新のCUDA/PyTorchベースイメージを使用
 - **音声処理対応**: libsoundfile1-dev、libasound2-dev等の音声処理ライブラリの整備方法をコメント等で案内
-- **UV使用**: pyproject.tomlベースの依存関係管理にUVを使用し、高速なパッケージインストールを実現
-
-### 使用例
-```bash
-# コンテナ起動
-docker build -t hiho-pytorch-base .
-docker run -it --gpus all hiho-pytorch-base
-
-# コンテナ内での作業
-git clone https://github.com/your-username/your-project.git
-cd your-project
-uv run python train.py config.yaml output/
-```
+- **uv使用**: pyproject.tomlベースの依存関係管理にuvを使用し、高速なパッケージインストールを実現
 
 ## 今後の作業
 
 1. **HDF5対応**: accent_estimatorのようなHDF5データセット対応
-2. **話者IDマッピング**: 多話者学習対応
-
-## 開発ガイドライン
 
 ### 参考プロジェクト
 - `../yukarin_sosoa`、`../yukarin_sosfd`、`../accent_estimator`のコードを参考にする
 - これらのプロジェクトのどれかに実装があれば、それを真似するようにする
 - **例外**: スケジューラーの実行タイミングは参照プロジェクトと異なり、エポックベースを採用
-
-### コーディング規約
-- **フォーマッター**: ruffを使用する
-  ```bash
-  uv run ruff check --fix
-  uv run ruff format
-  ```
-- **型アノテーション**: 全ての関数の引数と返り値に型アノテーションを必ず記述する
-  - 従来のPython型（`list`、`dict`）を使用し、`List[type]`、`Dict[str, type]`は使用しない
-  - 複雑な型は`typing.Any`を使用
-  - 例: `def function(param: str, data: dict[str, Any]) -> None:`
-- **互換性不要**: このプロジェクトは基準となるフレームワークのため、レガシー互換性コードは書かない
-- **デフォルト値禁止**: 原則として関数・メソッドの引数にデフォルト値を設定しない
-  - デフォルト値はメンテナンス性を下げ、意図しない動作の原因となる
-  - 特にnetwork/predictor.py等のコアコンポーネントでは厳格に禁止（Predictorクラスのforwardメソッドなど）
-  - 一時的な迂回や問題回避のためのデフォルト値追加は絶対に禁止
-  - 例外的に許可される場合：
-    - 公開ライブラリのユーザー向けAPI
-    - 十分に設計・検討されたシグネチャー（レビューが必要）
-  - 内部実装では全ての引数を明示的に渡すこと
-  - 適切な設計を行ってから実装すること（デフォルト値で迂回しない）
 
 ## 注意事項
 
@@ -327,3 +142,8 @@ uv run python train.py config.yaml output/
 - **スケジューラー**: エポックベースで実行（参照プロジェクトはイテレーションベース）
   - WarmupLRスケジューラーの`warmup_steps`はエポック数として解釈される
   - 設定例: `warmup_steps: 100`（100エポック）
+
+---
+
+@docs/設計.md
+@docs/コーディング規約.md
