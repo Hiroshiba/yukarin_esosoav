@@ -21,6 +21,12 @@ jobs:
       - name: <Setup> 依存関係をインストール
         run: uv sync
 
+      - name: <Test> 静的解析を実行
+        run: |
+          uv run pyright
+          uv run ruff check
+          uv run ruff format --check
+
       - name: <Test> テストを実行
         run: uv run pytest tests/
 
