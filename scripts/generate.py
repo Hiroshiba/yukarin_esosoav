@@ -12,7 +12,7 @@ from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.generator import Generator
-from utility.save_arguments import save_arguments
+from scripts.utility.save_arguments import save_arguments
 
 
 def _extract_number(f):

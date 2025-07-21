@@ -15,7 +15,7 @@ from hiho_pytorch_base.dataset import create_dataset
 from hiho_pytorch_base.model import Model
 from hiho_pytorch_base.network.predictor import create_predictor
 from scripts.generate import generate
-from train import train
+from scripts.train import train
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]):

@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `ProjectConfig`: プロジェクト設定（name、tags、category）
 
 ### 学習システム
-- `train.py`: 独自実装のPyTorch学習ループ
+- `scripts/train.py`: 独自実装のPyTorch学習ループ
   - `train()`: 設定から学習プロセスを実行
   - TensorBoard統合
   - torch.amp（Automatic Mixed Precision）対応
@@ -59,18 +59,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `create_train_config()`: テスト用設定作成
   - pathlistファイル生成（root_dirからの相対パス形式）
 - `tests/conftest.py`: pytest fixtures（テストデータ自動生成機能）
-- `tests/test_train.py`: 学習システムの統合テスト（train.py直接実行・全7テスト実装済み）
+- `tests/test_train.py`: 学習システムの統合テスト（scripts/train.py直接実行・全7テスト実装済み）
 
 ## 主要なファイル
 
 ### 学習実行
 ```bash
-uv run python train.py <config_yaml_path> <output_dir>
+uv run -m scripts.train <config_yaml_path> <output_dir>
 ```
 
-### 推論実行
+### 生成実行
 ```bash
-PYTHONPATH=. uv run python scripts/generate.py --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
+uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
 ```
 
 ### テスト実行
