@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from hiho_pytorch_base.batch import collate_dataset_output
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.dataset import create_dataset
+from hiho_pytorch_base.dataset import DatasetType, create_dataset
 from hiho_pytorch_base.evaluator import (
     Evaluator,
     EvaluatorOutput,
@@ -51,7 +51,7 @@ class TrainingResults:
 
     def to_summary_dict(self) -> dict[str, Any]:
         """ログ出力用の辞書を生成"""
-        return {"train": _delete_data_num(self.train)}
+        return {DatasetType.TRAIN.value: _delete_data_num(self.train)}
 
 
 @dataclass
@@ -65,11 +65,11 @@ class EvaluationResults:
     def to_summary_dict(self) -> dict[str, Any]:
         """ログ出力用の辞書を生成"""
         summary = {
-            "test": _delete_data_num(self.test),
-            "eval": _delete_data_num(self.eval),
+            DatasetType.TEST.value: _delete_data_num(self.test),
+            DatasetType.EVAL.value: _delete_data_num(self.eval),
         }
         if self.valid is not None:
-            summary["valid"] = _delete_data_num(self.valid)
+            summary[DatasetType.VALID.value] = _delete_data_num(self.valid)
         return summary
 
 

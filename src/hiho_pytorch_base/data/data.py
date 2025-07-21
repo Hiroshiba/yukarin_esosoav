@@ -6,6 +6,9 @@ import numpy
 import torch
 from torch import Tensor
 
+from hiho_pytorch_base.config import DatasetConfig
+from hiho_pytorch_base.data.sampling_data import SamplingData
+
 
 @dataclass
 class InputData:
@@ -13,7 +16,7 @@ class InputData:
 
     feature_vector: numpy.ndarray
     feature_variable: numpy.ndarray
-    target_vector: numpy.ndarray
+    target_vector: SamplingData
     target_scalar: float
     speaker_id: int
 
@@ -29,18 +32,25 @@ class OutputData:
     speaker_id: Tensor
 
 
-def preprocess(d: InputData, is_eval: bool) -> OutputData:
+def preprocess(d: InputData, config: DatasetConfig, is_eval: bool) -> OutputData:
     """データ処理"""
     variable_scalar = numpy.mean(d.feature_variable)
     enhanced_feature = d.feature_vector + variable_scalar
 
-    if is_eval:
-        enhanced_feature += numpy.random.randn(*enhanced_feature.shape) * 0.01
+    if not is_eval:
+        enhanced_feature += (
+            numpy.random.default_rng().normal(size=enhanced_feature.shape) * 0.01
+        )
+
+    resampled_data = d.target_vector.resample(
+        sampling_rate=config.frame_rate, length=config.frame_length
+    )
+    target_class = numpy.bincount(resampled_data[:, 0]).argmax()
 
     return OutputData(
         feature_vector=torch.from_numpy(enhanced_feature).float(),
         feature_variable=torch.from_numpy(d.feature_variable).float(),
-        target_vector=torch.from_numpy(d.target_vector).long(),
+        target_vector=torch.tensor(target_class).long(),
         target_scalar=torch.tensor(d.target_scalar).float(),
         speaker_id=torch.tensor(d.speaker_id).long(),
     )

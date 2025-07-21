@@ -16,8 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `TrainConfig`: 学習設定（batch_size、optimizer、scheduler、use_gpu等）
   - `ProjectConfig`: プロジェクト設定（name、tags、category）
 
-### F0予測システム
-- `train.py`: PyTorchベースの学習ループ
+### 学習システム
+- `scripts/train.py`: 独自実装のPyTorch学習ループ
+  - `train()`: 設定から学習プロセスを実行
   - TensorBoard統合
   - torch.amp（Automatic Mixed Precision）対応
   - 学習済みモデル・スナップショット保存
@@ -52,12 +53,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 学習実行
 ```bash
-uv run python train.py <config_yaml_path> <output_dir>
+uv run -m scripts.train <config_yaml_path> <output_dir>
 ```
 
-### 推論実行
+### 生成実行
 ```bash
-PYTHONPATH=. uv run python scripts/generate.py --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
+uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
 ```
 
 ### テスト実行
@@ -70,67 +71,14 @@ uv run pytest tests/ -sv
 uv sync
 ```
 
-### コードフォーマット
+### 静的解析とフォーマット
 ```bash
-uv run ruff check --fix
-uv run ruff format
+uv run pyright && uv run ruff check --fix && uv run ruff format
 ```
 
 ## 設定ファイル形式
 
-F0予測用のYAML設定例：
-```yaml
-dataset:
-  train:
-    feature_vector_pathlist_path: "data/feature_vector_pathlist.txt"
-    feature_variable_pathlist_path: "data/feature_variable_pathlist.txt"
-    target_vector_pathlist_path: "data/target_vector_pathlist.txt"
-    target_scalar_pathlist_path: "data/target_scalar_pathlist.txt"
-    speaker_dict_path: "data/speaker_dict.json"
-    root_dir: "data/"
-  valid:  # optional
-    feature_vector_pathlist_path: "data/valid_feature_vector_pathlist.txt"
-    feature_variable_pathlist_path: "data/valid_feature_variable_pathlist.txt"
-    target_vector_pathlist_path: "data/valid_target_vector_pathlist.txt"
-    target_scalar_pathlist_path: "data/valid_target_scalar_pathlist.txt"
-    speaker_dict_path: "data/speaker_dict.json"
-    root_dir: "data/"
-  test_num: 100
-  eval_times_num: 1
-  seed: 0
-
-network:
-  feature_vector_size: 128  # 音素特徴量のサイズ
-  feature_variable_size: 64  # 可変長特徴量のサイズ
-  hidden_size: 256
-  target_vector_size: 10  # F0予測の出力サイズ
-  speaker_size: 10  # 話者数
-  speaker_embedding_size: 16
-
-model: {}
-
-train:
-  batch_size: 32
-  eval_batch_size: 16
-  log_epoch: 1
-  eval_epoch: 10
-  snapshot_epoch: 100
-  stop_epoch: 1000
-  model_save_num: 5
-  optimizer:
-    name: "adam"
-    lr: 0.001
-  scheduler:
-    name: "warmup"
-    warmup_steps: 100
-  num_processes: 4
-  use_gpu: true
-  use_amp: true
-
-project:
-  name: "f0_prediction"
-  category: "speech"
-```
+YAML形式で設定を管理
 
 ## データ形式
 
@@ -202,3 +150,8 @@ data/
 - **話者管理**: speaker_dict.jsonで話者IDとラベルを管理
 - **可変長データ**: feature_variableは可変長データとして処理される
 - **パスリスト**: root_dirからの相対パス形式でファイルパスを管理する
+
+---
+
+@docs/設計.md
+@docs/コーディング規約.md

@@ -11,11 +11,11 @@ import pytest
 import yaml
 
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.dataset import create_dataset
+from hiho_pytorch_base.dataset import DatasetType, create_dataset
 from hiho_pytorch_base.model import Model
 from hiho_pytorch_base.network.predictor import create_predictor
 from scripts.generate import generate
-from train import train
+from scripts.train import train
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]):
@@ -85,6 +85,7 @@ def test_e2e_generate(train_output_dir: Path, tmp_path: Path) -> None:
         predictor_iteration=None,
         config_path=None,
         predictor_path=None,
+        dataset_type=DatasetType.EVAL,
         output_dir=generate_output_dir,
         use_gpu=False,
     )

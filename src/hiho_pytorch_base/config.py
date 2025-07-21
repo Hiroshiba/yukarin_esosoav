@@ -27,6 +27,8 @@ class DatasetConfig(BaseModel):
     test_num: int
     eval_times_num: int = 1
     seed: int = 0
+    frame_rate: float
+    frame_length: int
 
 
 class NetworkConfig(BaseModel):
