@@ -6,7 +6,6 @@ import numpy
 import torch
 from torch import Tensor
 
-from hiho_pytorch_base.config import DatasetConfig
 from hiho_pytorch_base.data.sampling_data import SamplingData
 
 
@@ -32,7 +31,9 @@ class OutputData:
     speaker_id: Tensor
 
 
-def preprocess(d: InputData, config: DatasetConfig, is_eval: bool) -> OutputData:
+def preprocess(
+    d: InputData, *, frame_rate: float, frame_length: int, is_eval: bool
+) -> OutputData:
     """データ処理"""
     variable_scalar = numpy.mean(d.feature_variable)
     enhanced_feature = d.feature_vector + variable_scalar
@@ -43,7 +44,7 @@ def preprocess(d: InputData, config: DatasetConfig, is_eval: bool) -> OutputData
         )
 
     resampled_data = d.target_vector.resample(
-        sampling_rate=config.frame_rate, length=config.frame_length
+        sampling_rate=frame_rate, length=frame_length
     )
     target_class = numpy.bincount(resampled_data[:, 0]).argmax()
 

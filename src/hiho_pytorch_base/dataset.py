@@ -143,7 +143,12 @@ class Dataset(BaseDataset[OutputData]):
         if isinstance(data, LazyInputData):
             data = data.generate()
 
-        return preprocess(data, self.config, is_eval=self.is_eval)
+        return preprocess(
+            data,
+            frame_rate=self.config.frame_rate,
+            frame_length=self.config.frame_length,
+            is_eval=self.is_eval,
+        )
 
 
 class DatasetType(str, Enum):
