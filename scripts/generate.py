@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.dataset import create_dataset
+from hiho_pytorch_base.dataset import DatasetType, create_dataset
 from hiho_pytorch_base.generator import Generator
 from scripts.utility.save_arguments import save_arguments
 
@@ -37,6 +37,7 @@ def generate(
     predictor_iteration: int | None,
     config_path: Path | None,
     predictor_path: Path | None,
+    dataset_type: DatasetType,
     output_dir: Path,
     use_gpu: bool,
 ):
@@ -65,7 +66,7 @@ def generate(
 
     generator = Generator(config=config, predictor=predictor_path, use_gpu=use_gpu)
 
-    dataset = create_dataset(config.dataset).test
+    dataset = create_dataset(config.dataset).get(dataset_type)
     data_loader = DataLoader(
         dataset=dataset,
         batch_size=1,
@@ -88,6 +89,7 @@ if __name__ == "__main__":
     parser.add_argument("--predictor_iteration", type=int)
     parser.add_argument("--config_path", type=Path)
     parser.add_argument("--predictor_path", type=Path)
+    parser.add_argument("--dataset_type", type=DatasetType, required=True)
     parser.add_argument("--output_dir", required=True, type=Path)
     parser.add_argument("--use_gpu", action="store_true")
     generate(**vars(parser.parse_args()))

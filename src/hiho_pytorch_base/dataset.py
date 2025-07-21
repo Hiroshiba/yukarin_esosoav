@@ -4,14 +4,15 @@ import json
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+from typing import assert_never
 
 import numpy
 from torch.utils.data import Dataset as BaseDataset
-from torch.utils.data._utils.collate import default_convert
 
 from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
-from hiho_pytorch_base.data.data import InputData, preprocess
+from hiho_pytorch_base.data.data import InputData, OutputData, preprocess
 from hiho_pytorch_base.data.sampling_data import SamplingData
 
 
@@ -119,7 +120,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
     return datas
 
 
-class Dataset(BaseDataset):
+class Dataset(BaseDataset[OutputData]):
     """メインのデータセット"""
 
     def __init__(
@@ -136,13 +137,22 @@ class Dataset(BaseDataset):
         """データセットのサイズ"""
         return len(self.datas)
 
-    def __getitem__(self, i: int):
+    def __getitem__(self, i: int) -> OutputData:
         """指定されたインデックスのデータを前処理して返す"""
         data = self.datas[i]
         if isinstance(data, LazyInputData):
             data = data.generate()
 
-        return default_convert(preprocess(data, self.config, is_eval=self.is_eval))
+        return preprocess(data, self.config, is_eval=self.is_eval)
+
+
+class DatasetType(str, Enum):
+    """データセットタイプ"""
+
+    TRAIN = "train"
+    TEST = "test"
+    EVAL = "eval"
+    VALID = "valid"
 
 
 @dataclass
@@ -160,6 +170,22 @@ class DatasetCollection:
 
     valid: Dataset | None
     """trainやtestと異なり、評価専用に用いる"""
+
+    def get(self, type: DatasetType) -> Dataset:
+        """指定されたタイプのデータセットを返す"""
+        match type:
+            case DatasetType.TRAIN:
+                return self.train
+            case DatasetType.TEST:
+                return self.test
+            case DatasetType.EVAL:
+                return self.eval
+            case DatasetType.VALID:
+                if self.valid is None:
+                    raise ValueError("validデータセットが設定されていません")
+                return self.valid
+            case _:
+                assert_never(type)
 
 
 def create_dataset(config: DatasetConfig) -> DatasetCollection:

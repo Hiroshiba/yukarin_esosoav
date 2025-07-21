@@ -7,13 +7,16 @@ from typing import Any
 
 import yaml
 
+from hiho_pytorch_base.dataset import DatasetType
 
-def _path_represent(dumper, data):
+
+def _str_represent(dumper, data):
     return dumper.represent_str(str(data))
 
 
-yaml.SafeDumper.add_representer(PosixPath, _path_represent)
-yaml.SafeDumper.add_representer(WindowsPath, _path_represent)
+yaml.SafeDumper.add_representer(PosixPath, _str_represent)
+yaml.SafeDumper.add_representer(WindowsPath, _str_represent)
+yaml.SafeDumper.add_representer(DatasetType, _str_represent)
 
 
 def save_arguments(path: Path, target_function: Callable, arguments: dict[str, Any]):
