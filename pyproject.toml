@@ -17,10 +17,6 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [dependency-groups]
 dev = [
     "pyright>=1.1.403",
@@ -57,3 +53,7 @@ convention = "numpy"
 
 [tool.ruff.format]
 docstring-code-format = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
