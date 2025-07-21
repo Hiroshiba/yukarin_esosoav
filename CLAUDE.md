@@ -83,9 +83,9 @@ uv run pytest tests/ -sv
 uv sync
 ```
 
-### Ruffでコードフォーマット
+### 静的解析とフォーマット
 ```bash
-uv run ruff check --fix && uv run ruff format
+uv run ruff check --fix && uv run pyright && uv run ruff format
 ```
 
 ## 設定ファイル形式
