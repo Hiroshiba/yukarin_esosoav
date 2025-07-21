@@ -12,11 +12,11 @@ from hiho_pytorch_base.data.data import OutputData
 class BatchOutput:
     """バッチ処理後のデータ構造"""
 
-    feature_vector: Tensor
-    feature_variable_list: list[Tensor]
-    target_vector: Tensor
-    target_scalar: Tensor
-    speaker_id: Tensor
+    feature_vector: Tensor  # (B, ?)
+    feature_variable_list: list[Tensor]  # [(L, ?)]
+    target_vector: Tensor  # (B, ?)
+    target_scalar: Tensor  # (B,)
+    speaker_id: Tensor  # (B,)
 
     @property
     def data_num(self) -> int:

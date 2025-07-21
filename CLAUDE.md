@@ -85,8 +85,7 @@ uv sync
 
 ### Ruffでコードフォーマット
 ```bash
-uv run ruff check --fix
-uv run ruff format
+uv run ruff check --fix && uv run ruff format
 ```
 
 ## 設定ファイル形式
