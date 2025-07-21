@@ -45,9 +45,9 @@ class SamplingData:
         if length is None:
             length = int(len(self.array) / self.rate * sampling_rate)
         if kind == ResampleInterpolateKind.nearest:
-            indexes = (numpy.random.rand() + index + numpy.arange(length)) * (
-                self.rate / sampling_rate
-            )
+            indexes = (
+                numpy.random.default_rng().random() + index + numpy.arange(length)
+            ) * (self.rate / sampling_rate)
             return self.array[indexes.astype(int)]
         else:
             indexes = (index + numpy.arange(length)) * (self.rate / sampling_rate)

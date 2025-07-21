@@ -38,7 +38,9 @@ def preprocess(d: InputData, config: DatasetConfig, is_eval: bool) -> OutputData
     enhanced_feature = d.feature_vector + variable_scalar
 
     if not is_eval:
-        enhanced_feature += numpy.random.randn(*enhanced_feature.shape) * 0.01
+        enhanced_feature += (
+            numpy.random.default_rng().normal(size=enhanced_feature.shape) * 0.01
+        )
 
     resampled_data = d.target_vector.resample(
         sampling_rate=config.frame_rate, length=config.frame_length

@@ -51,8 +51,10 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
 
     # 固定長特徴ベクトル
     def generate_feature_vector(file_path: Path) -> None:
-        feature_vector = np.random.randn(config.network.feature_vector_size).astype(
-            np.float32
+        feature_vector = (
+            np.random.default_rng()
+            .normal(size=config.network.feature_vector_size)
+            .astype(np.float32)
         )
         np.save(file_path, feature_vector)
 
@@ -60,10 +62,12 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
 
     # 可変長特徴データ
     def generate_feature_variable(file_path: Path) -> None:
-        variable_length = int(np.random.randint(5, 15))
-        feature_variable = np.random.randn(
-            variable_length, config.network.feature_variable_size
-        ).astype(np.float32)
+        variable_length = int(np.random.default_rng().integers(5, 15))
+        feature_variable = (
+            np.random.default_rng()
+            .normal(size=(variable_length, config.network.feature_variable_size))
+            .astype(np.float32)
+        )
         np.save(file_path, feature_variable)
 
     _setup_data(generate_feature_variable, "feature_variable", "npy")
@@ -71,8 +75,8 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
     # サンプリングデータ
     def generate_target_vector(file_path: Path) -> None:
         array_length = config.dataset.frame_length
-        array = np.random.randint(
-            0, config.network.target_vector_size, array_length, dtype=np.int64
+        array = np.random.default_rng().integers(
+            0, config.network.target_vector_size, size=array_length, dtype=np.int64
         )
         sampling_data = SamplingData(array=array, rate=config.dataset.frame_rate)
         sampling_data.save(file_path)
@@ -81,10 +85,10 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
 
     # 回帰ターゲット
     def generate_target_scalar(file_path: Path) -> None:
-        target_class = np.random.randint(
+        target_class = np.random.default_rng().integers(
             0, config.network.target_vector_size, dtype=np.int64
         )
-        target_scalar = float(target_class) + np.random.randn() * 0.1
+        target_scalar = float(target_class) + np.random.default_rng().normal() * 0.1
         np.save(file_path, target_scalar)
 
     _setup_data(generate_target_scalar, "target_scalar", "npy")
