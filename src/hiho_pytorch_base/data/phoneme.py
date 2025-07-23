@@ -59,7 +59,7 @@ class BasePhoneme:
 
     @classmethod
     @abstractmethod
-    def convert(cls, phonemes: Sequence[Self]) -> Sequence[Self]:
+    def convert(cls, phonemes: list[Self]) -> list[Self]:
         pass
 
     @classmethod
@@ -171,7 +171,7 @@ class ArpaPhoneme(BasePhoneme):
         return phoneme_name in cls.vowel_phonemes
 
     @classmethod
-    def convert(cls, phonemes: Sequence[Self]) -> Sequence[Self]:  # type: ignore
+    def convert(cls, phonemes: list[Self]) -> list[Self]:  # type: ignore
         """音素リストを正規化し、ストレス情報を分離・設定する"""
         for phoneme in phonemes:
             # ストレス情報の分離と設定

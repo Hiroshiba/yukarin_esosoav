@@ -1,6 +1,5 @@
 """データセットモジュール"""
 
-import json
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -8,6 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import assert_never
 
+from pydantic import TypeAdapter
 from torch.utils.data import Dataset as BaseDataset
 
 from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
@@ -37,86 +37,6 @@ class LazyInputData:
             volume_data=SamplingData.load(self.volume_path),
             speaker_id=self.speaker_id,
         )
-
-
-PathMap = dict[str, Path]
-"""パスマップ。stemをキー、パスを値とする辞書型"""
-
-
-def _load_pathlist(pathlist_path: Path, root_dir: Path) -> PathMap:
-    """pathlistファイルを読み込みんでパスマップを返す。"""
-    path_list = [root_dir / p for p in pathlist_path.read_text().splitlines()]
-    return {p.stem: p for p in path_list}
-
-
-def get_data_paths(
-    root_dir: Path | None, pathlist_paths: list[Path]
-) -> tuple[list[str], list[PathMap]]:
-    """複数のpathlistファイルからstemリストとパスマップを返す。整合性も確認する。"""
-    if len(pathlist_paths) == 0:
-        raise ValueError("少なくとも1つのpathlist設定が必要です")
-
-    if root_dir is None:
-        root_dir = Path(".")
-
-    path_mappings: list[PathMap] = []
-
-    # 最初のpathlistをベースにstemリストを作成
-    first_pathlist_path = pathlist_paths[0]
-    first_paths = _load_pathlist(first_pathlist_path, root_dir)
-    fn_list = sorted(first_paths.keys())
-    assert len(fn_list) > 0, f"ファイルが存在しません: {first_pathlist_path}"
-
-    path_mappings.append(first_paths)
-
-    # 残りのpathlistが同じstemセットを持つかチェック
-    for pathlist_path in pathlist_paths[1:]:
-        paths = _load_pathlist(pathlist_path, root_dir)
-        assert set(fn_list) == set(paths.keys()), (
-            f"ファイルが一致しません: {pathlist_path} (expected: {len(fn_list)}, got: {len(paths)})"
-        )
-        path_mappings.append(paths)
-
-    return fn_list, path_mappings
-
-
-def get_datas(config: DataFileConfig) -> list[LazyInputData]:
-    """データを取得"""
-    (
-        fn_list,
-        (
-            f0_pathmappings,
-            volume_pathmappings,
-            lab_pathmappings,
-        ),
-    ) = get_data_paths(
-        config.root_dir,
-        [
-            config.f0_pathlist_path,
-            config.volume_pathlist_path,
-            config.lab_pathlist_path,
-        ],
-    )
-
-    fn_each_speaker: dict[str, list[str]] = json.loads(
-        config.speaker_dict_path.read_text()
-    )
-    speaker_ids = {
-        fn: speaker_id
-        for speaker_id, fns in enumerate(fn_each_speaker.values())
-        for fn in fns
-    }
-
-    datas = [
-        LazyInputData(
-            f0_path=f0_pathmappings[fn],
-            volume_path=volume_pathmappings[fn],
-            lab_path=lab_pathmappings[fn],
-            speaker_id=speaker_ids[fn],
-        )
-        for fn in fn_list
-    ]
-    return datas
 
 
 class Dataset(BaseDataset[OutputData]):
@@ -185,6 +105,86 @@ class DatasetCollection:
                 return self.valid
             case _:
                 assert_never(type)
+
+
+PathMap = dict[str, Path]
+"""パスマップ。stemをキー、パスを値とする辞書型"""
+
+
+def _load_pathlist(pathlist_path: Path, root_dir: Path) -> PathMap:
+    """pathlistファイルを読み込みんでパスマップを返す。"""
+    path_list = [root_dir / p for p in pathlist_path.read_text().splitlines()]
+    return {p.stem: p for p in path_list}
+
+
+def get_data_paths(
+    root_dir: Path | None, pathlist_paths: list[Path]
+) -> tuple[list[str], list[PathMap]]:
+    """複数のpathlistファイルからstemリストとパスマップを返す。整合性も確認する。"""
+    if len(pathlist_paths) == 0:
+        raise ValueError("少なくとも1つのpathlist設定が必要です")
+
+    if root_dir is None:
+        root_dir = Path(".")
+
+    path_mappings: list[PathMap] = []
+
+    # 最初のpathlistをベースにstemリストを作成
+    first_pathlist_path = pathlist_paths[0]
+    first_paths = _load_pathlist(first_pathlist_path, root_dir)
+    fn_list = sorted(first_paths.keys())
+    assert len(fn_list) > 0, f"ファイルが存在しません: {first_pathlist_path}"
+
+    path_mappings.append(first_paths)
+
+    # 残りのpathlistが同じstemセットを持つかチェック
+    for pathlist_path in pathlist_paths[1:]:
+        paths = _load_pathlist(pathlist_path, root_dir)
+        assert set(fn_list) == set(paths.keys()), (
+            f"ファイルが一致しません: {pathlist_path} (expected: {len(fn_list)}, got: {len(paths)})"
+        )
+        path_mappings.append(paths)
+
+    return fn_list, path_mappings
+
+
+def get_datas(config: DataFileConfig) -> list[LazyInputData]:
+    """データを取得"""
+    (
+        fn_list,
+        (
+            f0_pathmappings,
+            volume_pathmappings,
+            lab_pathmappings,
+        ),
+    ) = get_data_paths(
+        config.root_dir,
+        [
+            config.f0_pathlist_path,
+            config.volume_pathlist_path,
+            config.lab_pathlist_path,
+        ],
+    )
+
+    fn_each_speaker = TypeAdapter(dict[str, list[str]]).validate_json(
+        config.speaker_dict_path.read_text()
+    )
+    speaker_ids = {
+        fn: speaker_id
+        for speaker_id, fns in enumerate(fn_each_speaker.values())
+        for fn in fns
+    }
+
+    datas = [
+        LazyInputData(
+            f0_path=f0_pathmappings[fn],
+            volume_path=volume_pathmappings[fn],
+            lab_path=lab_pathmappings[fn],
+            speaker_id=speaker_ids[fn],
+        )
+        for fn in fn_list
+    ]
+    return datas
 
 
 def create_dataset(config: DatasetConfig) -> DatasetCollection:
