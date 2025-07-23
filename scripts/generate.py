@@ -47,16 +47,12 @@ def generate(
             model_dir=model_dir, iteration=predictor_iteration
         )
     else:
-        raise AssertionError(
-            "predictor_path または model_dir のいずれかを指定してください"
-        )
+        raise ValueError("predictor_path または model_dir のいずれかを指定してください")
 
     if config_path is None and model_dir is not None:
         config_path = model_dir / "config.yaml"
     else:
-        raise AssertionError(
-            "config_path または model_dir のいずれかを指定してください"
-        )
+        raise ValueError("config_path または model_dir のいずれかを指定してください")
 
     output_dir.mkdir(exist_ok=True)
     save_arguments(output_dir / "arguments.yaml", generate, locals())

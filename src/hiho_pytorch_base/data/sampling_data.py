@@ -154,7 +154,7 @@ class SamplingData:
 
         if centering:
             if padding_value is None:
-                raise AssertionError(
+                raise ValueError(
                     "centering=True のときは padding_value を指定してください"
                 )
             width = [[frame_length // 2, frame_length // 2]] + [[0, 0]] * (
