@@ -2,9 +2,8 @@
 
 from dataclasses import dataclass
 
-import torch
 from torch import Tensor, nn
-from torch.nn.functional import cross_entropy, mse_loss
+from torch.nn.functional import mse_loss
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.config import ModelConfig
@@ -19,20 +18,8 @@ class ModelOutput(DataNumProtocol):
     loss: Tensor
     """逆伝播させる損失"""
 
-    loss_vector: Tensor
-    loss_scalar: Tensor
-    accuracy: Tensor
-
-
-def accuracy(
-    output: Tensor,  # (B, ?)
-    target: Tensor,  # (B,)
-) -> Tensor:
-    """分類精度を計算"""
-    with torch.no_grad():
-        indexes = torch.argmax(output, dim=1)  # (B,)
-        correct = torch.eq(indexes, target).view(-1)  # (B,)
-        return correct.float().mean()
+    f0_loss: Tensor
+    """F0予測損失"""
 
 
 class Model(nn.Module):
@@ -45,27 +32,22 @@ class Model(nn.Module):
 
     def forward(self, batch: BatchOutput) -> ModelOutput:
         """データをネットワークに入力して損失などを計算する"""
-        (
-            vector_output,  # (B, ?)
-            scalar_output,  # (B,)
-        ) = self.predictor(
-            feature_vector=batch.feature_vector,
-            feature_variable_list=batch.feature_variable_list,
+        f0_output = self.predictor(
+            lab_phoneme_ids=batch.lab_phoneme_ids,
+            lab_durations=batch.lab_durations,
+            f0_data=batch.f0_data,
+            volume_data=batch.volume_data,
             speaker_id=batch.speaker_id,
-        )
+        )  # (B,)
 
-        target_vector = batch.target_vector  # (B,)
-        target_scalar = batch.target_scalar  # (B,)
+        # ターゲットとして母音F0の平均を使用
+        target_f0 = batch.vowel_f0_means.mean(dim=1)  # (B, V) -> (B,)
 
-        loss_vector = cross_entropy(vector_output, target_vector)
-        loss_scalar = mse_loss(scalar_output, target_scalar)
-        total_loss = loss_vector + loss_scalar
-        acc = accuracy(vector_output, target_vector)
+        # MSE損失を計算
+        f0_loss = mse_loss(f0_output, target_f0)
 
         return ModelOutput(
-            loss=total_loss,
-            loss_vector=loss_vector,
-            loss_scalar=loss_scalar,
-            accuracy=acc,
+            loss=f0_loss,
+            f0_loss=f0_loss,
             data_num=batch.data_num,
         )

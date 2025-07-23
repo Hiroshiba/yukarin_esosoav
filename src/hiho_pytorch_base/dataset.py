@@ -8,11 +8,15 @@ from enum import Enum
 from pathlib import Path
 from typing import assert_never
 
-import numpy
 from torch.utils.data import Dataset as BaseDataset
 
 from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
-from hiho_pytorch_base.data.data import InputData, OutputData, preprocess
+from hiho_pytorch_base.data.data import (
+    InputData,
+    OutputData,
+    preprocess,
+)
+from hiho_pytorch_base.data.phoneme import ArpaPhoneme
 from hiho_pytorch_base.data.sampling_data import SamplingData
 
 
@@ -20,19 +24,17 @@ from hiho_pytorch_base.data.sampling_data import SamplingData
 class LazyInputData:
     """遅延読み込み対応の入力データ構造"""
 
-    feature_vector_path: Path
-    feature_variable_path: Path
-    target_vector_path: Path
-    target_scalar_path: Path
+    f0_path: Path
+    volume_path: Path
+    lab_path: Path
     speaker_id: int
 
     def generate(self) -> InputData:
-        """ファイルからデータを読み込んでInputDataを生成"""
+        """ファイルからデータを読み込んでDatasetInputを生成"""
         return InputData(
-            feature_vector=numpy.load(self.feature_vector_path, allow_pickle=True),
-            feature_variable=numpy.load(self.feature_variable_path, allow_pickle=True),
-            target_vector=SamplingData.load(self.target_vector_path),
-            target_scalar=float(numpy.load(self.target_scalar_path, allow_pickle=True)),
+            phonemes=ArpaPhoneme.load_julius_list(self.lab_path),
+            f0_data=SamplingData.load(self.f0_path),
+            volume_data=SamplingData.load(self.volume_path),
             speaker_id=self.speaker_id,
         )
 
@@ -83,18 +85,16 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
     (
         fn_list,
         (
-            feature_vector_pathmappings,
-            feature_variable_pathmappings,
-            target_vector_pathmappings,
-            target_scalar_pathmappings,
+            f0_pathmappings,
+            volume_pathmappings,
+            lab_pathmappings,
         ),
     ) = get_data_paths(
         config.root_dir,
         [
-            config.feature_vector_pathlist_path,
-            config.feature_variable_pathlist_path,
-            config.target_vector_pathlist_path,
-            config.target_scalar_pathlist_path,
+            config.f0_pathlist_path,
+            config.volume_pathlist_path,
+            config.lab_pathlist_path,
         ],
     )
 
@@ -103,16 +103,15 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
     )
     speaker_ids = {
         fn: speaker_id
-        for speaker_id, (_, fns) in enumerate(fn_each_speaker.items())
+        for speaker_id, fns in enumerate(fn_each_speaker.values())
         for fn in fns
     }
 
     datas = [
         LazyInputData(
-            feature_vector_path=feature_vector_pathmappings[fn],
-            feature_variable_path=feature_variable_pathmappings[fn],
-            target_vector_path=target_vector_pathmappings[fn],
-            target_scalar_path=target_scalar_pathmappings[fn],
+            f0_path=f0_pathmappings[fn],
+            volume_path=volume_pathmappings[fn],
+            lab_path=lab_pathmappings[fn],
             speaker_id=speaker_ids[fn],
         )
         for fn in fn_list
@@ -143,7 +142,7 @@ class Dataset(BaseDataset[OutputData]):
         if isinstance(data, LazyInputData):
             data = data.generate()
 
-        return preprocess(data, self.config, is_eval=self.is_eval)
+        return preprocess(data, is_eval=self.is_eval)
 
 
 class DatasetType(str, Enum):

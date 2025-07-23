@@ -1,29 +1,23 @@
 dataset:
   train:
-    feature_vector_pathlist_path: "tests/data/test_data/train_feature_vector_pathlist.txt"
-    feature_variable_pathlist_path: "tests/data/test_data/train_feature_variable_pathlist.txt"
-    target_vector_pathlist_path: "tests/data/test_data/train_target_vector_pathlist.txt"
-    target_scalar_pathlist_path: "tests/data/test_data/train_target_scalar_pathlist.txt"
+    f0_pathlist_path: "tests/data/test_data/train_f0_pathlist.txt"
+    volume_pathlist_path: "tests/data/test_data/train_volume_pathlist.txt"
+    lab_pathlist_path: "tests/data/test_data/train_lab_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   valid:
-    feature_vector_pathlist_path: "tests/data/test_data/valid_feature_vector_pathlist.txt"
-    feature_variable_pathlist_path: "tests/data/test_data/valid_feature_variable_pathlist.txt"
-    target_vector_pathlist_path: "tests/data/test_data/valid_target_vector_pathlist.txt"
-    target_scalar_pathlist_path: "tests/data/test_data/valid_target_scalar_pathlist.txt"
+    f0_pathlist_path: "tests/data/test_data/valid_f0_pathlist.txt"
+    volume_pathlist_path: "tests/data/test_data/valid_volume_pathlist.txt"
+    lab_pathlist_path: "tests/data/test_data/valid_lab_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   test_num: 16
   eval_times_num: 1
   seed: 42
-  frame_rate: 10.0
-  frame_length: 50
 
 network:
-  feature_vector_size: 16
-  feature_variable_size: 32
+  phoneme_size: 49
   hidden_size: 32
-  target_vector_size: 3
   conformer_layers: 1
   conformer_heads: 2
   conformer_ff_dim: 32

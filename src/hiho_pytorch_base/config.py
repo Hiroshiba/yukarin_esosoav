@@ -11,10 +11,9 @@ from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
 class DataFileConfig(BaseModel):
     """データファイルの設定"""
 
-    feature_vector_pathlist_path: Path
-    feature_variable_pathlist_path: Path
-    target_vector_pathlist_path: Path
-    target_scalar_pathlist_path: Path
+    f0_pathlist_path: Path
+    volume_pathlist_path: Path
+    lab_pathlist_path: Path
     speaker_dict_path: Path
     root_dir: Path | None
 
@@ -27,17 +26,13 @@ class DatasetConfig(BaseModel):
     test_num: int
     eval_times_num: int = 1
     seed: int = 0
-    frame_rate: float
-    frame_length: int
 
 
 class NetworkConfig(BaseModel):
     """ニューラルネットワークの設定"""
 
-    feature_vector_size: int
-    feature_variable_size: int
+    phoneme_size: int
     hidden_size: int
-    target_vector_size: int
     conformer_layers: int
     conformer_heads: int
     conformer_ff_dim: int

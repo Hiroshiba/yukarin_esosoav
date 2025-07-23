@@ -49,49 +49,75 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
         if not valid_pathlist_path.exists():
             valid_pathlist_path.write_text("\n".join(all_relative_paths[train_num:]))
 
-    # 固定長特徴ベクトル
-    def generate_feature_vector(file_path: Path) -> None:
-        feature_vector = (
-            np.random.default_rng()
-            .normal(size=config.network.feature_vector_size)
-            .astype(np.float32)
-        )
-        np.save(file_path, feature_vector)
+    # 共通のフレーム長を生成（F0とvolumeで一致させる）
+    np.random.seed(42)  # 再現性のため
+    frame_lengths = {stem: int(np.random.randint(50, 200)) for stem in all_stems}
 
-    _setup_data(generate_feature_vector, "feature_vector", "npy")
-
-    # 可変長特徴データ
-    def generate_feature_variable(file_path: Path) -> None:
-        variable_length = int(np.random.default_rng().integers(5, 15))
-        feature_variable = (
-            np.random.default_rng()
-            .normal(size=(variable_length, config.network.feature_variable_size))
-            .astype(np.float32)
-        )
-        np.save(file_path, feature_variable)
-
-    _setup_data(generate_feature_variable, "feature_variable", "npy")
-
-    # サンプリングデータ
-    def generate_target_vector(file_path: Path) -> None:
-        array_length = config.dataset.frame_length
-        array = np.random.default_rng().integers(
-            0, config.network.target_vector_size, size=array_length, dtype=np.int64
-        )
-        sampling_data = SamplingData(array=array, rate=config.dataset.frame_rate)
+    # F0データ
+    def generate_f0(file_path: Path) -> None:
+        stem = file_path.stem
+        f0_length = frame_lengths[stem]
+        f0_data = np.random.uniform(80, 300, f0_length).astype(np.float32)  # F0値 (Hz)
+        # 一部を無声（0）にする
+        unvoiced_mask = np.random.random(f0_length) < 0.3
+        f0_data[unvoiced_mask] = 0.0
+        # SamplingDataで保存（200Hzのフレームレート）
+        sampling_data = SamplingData(array=f0_data[:, np.newaxis], rate=200.0)
         sampling_data.save(file_path)
 
-    _setup_data(generate_target_vector, "target_vector", "npy")
+    _setup_data(generate_f0, "f0", "npy")
 
-    # 回帰ターゲット
-    def generate_target_scalar(file_path: Path) -> None:
-        target_class = np.random.default_rng().integers(
-            0, config.network.target_vector_size, dtype=np.int64
-        )
-        target_scalar = float(target_class) + np.random.default_rng().normal() * 0.1
-        np.save(file_path, target_scalar)
+    # ボリュームデータ
+    def generate_volume(file_path: Path) -> None:
+        stem = file_path.stem
+        volume_length = frame_lengths[stem]  # F0と同じ長さを使用
+        volume_data = np.random.uniform(-60, -20, volume_length).astype(
+            np.float32
+        )  # dB
+        # SamplingDataで保存（200Hzのフレームレート）
+        sampling_data = SamplingData(array=volume_data[:, np.newaxis], rate=200.0)
+        sampling_data.save(file_path)
 
-    _setup_data(generate_target_scalar, "target_scalar", "npy")
+    _setup_data(generate_volume, "volume", "npy")
+
+    # LABデータ（音素情報）
+    def generate_lab(file_path: Path) -> None:
+        # ArpaPhoneme形式のLABファイルを生成
+
+        stem = file_path.stem
+        frame_length = frame_lengths[stem]
+        frame_rate = 200.0
+        total_duration = frame_length / frame_rate  # F0/volumeデータの総時間
+
+        # ランダムに音素を選択（母音と子音を混合）
+        vowel_phonemes = ["AA1", "EH0", "IY2", "AE1", "OW0"]
+        consonant_phonemes = ["pau", "B", "T", "NG", "K"]
+        phoneme_names = vowel_phonemes + consonant_phonemes
+
+        num_phonemes = int(np.random.randint(3, 8))
+        # 最低1つの母音を保証
+        selected_phonemes = [np.random.choice(vowel_phonemes)]
+        remaining_count = num_phonemes - 1
+        if remaining_count > 0:
+            selected_phonemes.extend(np.random.choice(phoneme_names, remaining_count))
+        selected_phonemes = np.array(selected_phonemes[:num_phonemes])
+
+        # 音素の継続時間を総時間に比例配分
+        duration_weights = np.random.uniform(0.5, 2.0, num_phonemes)
+        duration_weights = duration_weights / np.sum(duration_weights)  # 正規化
+        durations = duration_weights * total_duration  # 総時間に合わせる
+
+        # 音素の時間情報を生成
+        current_time = 0.0
+        lab_lines = []
+        for phoneme, duration in zip(selected_phonemes, durations, strict=False):
+            end_time = current_time + duration
+            lab_lines.append(f"{current_time:.4f}\t{end_time:.4f}\t{phoneme}")
+            current_time = end_time
+
+        file_path.write_text("\n".join(lab_lines))
+
+    _setup_data(generate_lab, "lab", "lab")
 
     # 話者マッピング
     speaker_names = ["A", "B", "C"]

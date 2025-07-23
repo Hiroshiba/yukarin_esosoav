@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
+from torch.nn.functional import mse_loss
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
@@ -20,7 +21,7 @@ class EvaluatorOutput(DataNumProtocol):
 
 def calculate_value(output: EvaluatorOutput) -> Tensor:
     """評価値の良し悪しを計算する関数。高いほど良い。"""
-    return output.accuracy
+    return -1 * output.loss
 
 
 class Evaluator(nn.Module):
@@ -33,22 +34,26 @@ class Evaluator(nn.Module):
     @torch.no_grad()
     def forward(self, batch: BatchOutput) -> EvaluatorOutput:
         """データをネットワークに入力して評価値を計算する"""
-        feature_vector = batch.feature_vector  # (B, ?)
-        feature_variable_list = batch.feature_variable_list  # [(vL, ?)]
-        target = batch.target_vector  # (B,)
+        # TODO: 適当な実装なので変更する
+
+        # ターゲットとして母音F0の平均を使用
+        target_f0 = batch.vowel_f0_means.mean(dim=1)  # (B, V) -> (B,)
 
         output_result: GeneratorOutput = self.generator(
-            feature_vector=feature_vector,
-            feature_variable_list=feature_variable_list,
+            lab_phoneme_ids=batch.lab_phoneme_ids,
+            lab_durations=batch.lab_durations,
+            f0_data=batch.f0_data,
+            volume_data=batch.volume_data,
             speaker_id=batch.speaker_id,
         )
-        output = output_result.vector_output  # (B, ?)
+        predicted_f0 = output_result.f0_output  # (B,)
 
-        loss = torch.nn.functional.cross_entropy(output, target)
+        # MSE損失を計算
+        loss = mse_loss(predicted_f0, target_f0)
 
-        indexes = torch.argmax(output, dim=1)  # (B,)
-        correct = torch.eq(indexes, target).view(-1)  # (B,)
-        accuracy = correct.float().mean()
+        # 適当な精度指標（相対誤差の逆数）
+        relative_error = torch.abs(predicted_f0 - target_f0) / (target_f0 + 1e-8)
+        accuracy = 1.0 / (1.0 + torch.mean(relative_error))
 
         return EvaluatorOutput(
             loss=loss,

@@ -6,18 +6,17 @@ import numpy
 import torch
 from torch import Tensor
 
-from hiho_pytorch_base.config import DatasetConfig
-from hiho_pytorch_base.data.sampling_data import SamplingData
+from hiho_pytorch_base.data.phoneme import ArpaPhoneme
+from hiho_pytorch_base.data.sampling_data import ResampleInterpolateKind, SamplingData
 
 
 @dataclass
 class InputData:
-    """データ処理前のデータ構造"""
+    """データ処理前のデータ構造（SamplingData + ArpaPhonemeリストベース）"""
 
-    feature_vector: numpy.ndarray
-    feature_variable: numpy.ndarray
-    target_vector: SamplingData
-    target_scalar: float
+    phonemes: list[ArpaPhoneme]  # 音素のリスト（ストレス情報含む）
+    f0_data: SamplingData  # F0のSamplingData
+    volume_data: SamplingData  # volumeのSamplingData
     speaker_id: int
 
 
@@ -25,32 +24,150 @@ class InputData:
 class OutputData:
     """データ処理後のデータ構造"""
 
-    feature_vector: Tensor
-    feature_variable: Tensor
-    target_vector: Tensor
-    target_scalar: Tensor
+    phoneme_id: Tensor  # 音素ID
+    phoneme_duration: Tensor  # 音素継続時間
+    f0: Tensor  # F0
+    volume: Tensor  # 音量
+    vowel_f0_means: Tensor  # 各母音のF0
+    vowel_index: Tensor  # 音素列のなかで母音のインデックス
+    stress: Tensor  # 母音ごとのストレス値（0, 1, 2）
     speaker_id: Tensor
 
 
-def preprocess(d: InputData, config: DatasetConfig, is_eval: bool) -> OutputData:
-    """データ処理"""
-    variable_scalar = numpy.mean(d.feature_variable)
-    enhanced_feature = d.feature_vector + variable_scalar
-
-    if not is_eval:
-        enhanced_feature += (
-            numpy.random.default_rng().normal(size=enhanced_feature.shape) * 0.01
+def calculate_vowel_f0_weighted_mean(
+    f0: numpy.ndarray,
+    volume: numpy.ndarray,
+    vowel_index: numpy.ndarray,
+    durations: numpy.ndarray,
+    frame_rate: float,
+) -> numpy.ndarray:
+    """母音区間でのF0重み付け平均を計算する"""
+    if len(vowel_index) == 0:
+        raise ValueError(
+            "母音インデックスが空です。LABファイルに母音が含まれていない可能性があります。"
         )
 
-    resampled_data = d.target_vector.resample(
-        sampling_rate=config.frame_rate, length=config.frame_length
-    )
-    target_class = numpy.bincount(resampled_data[:, 0]).argmax()
+    # 音素の時間範囲を計算
+    phoneme_times = numpy.cumsum(numpy.concatenate([[0], durations]))
+    vowel_start_times = phoneme_times[vowel_index]
+    vowel_end_times = phoneme_times[vowel_index + 1]
+    vowel_start_frames = (vowel_start_times * frame_rate).astype(int)
+    vowel_end_frames = (vowel_end_times * frame_rate).astype(int)
 
+    # F0をNaNに変換（F0=0は無声区間）
+    f0_masked = f0.copy().astype(float)
+    f0_masked[f0_masked == 0] = numpy.nan
+
+    # dB → 振幅変換
+    volume_amplitude = numpy.power(10, volume / 20.0)
+
+    # 各母音セグメントを処理
+    vowel_f0_means = []
+    for start_frame, end_frame in zip(
+        vowel_start_frames, vowel_end_frames, strict=True
+    ):
+        f0_segment = f0_masked[start_frame:end_frame]
+        volume_segment = volume_amplitude[start_frame:end_frame]
+
+        # 有効なF0値のみで重み付け平均を計算
+        valid_mask = ~numpy.isnan(f0_segment)
+
+        if numpy.any(valid_mask) and numpy.sum(volume_segment[valid_mask]) > 0:
+            weighted_mean = numpy.sum(
+                f0_segment[valid_mask] * volume_segment[valid_mask]
+            ) / numpy.sum(volume_segment[valid_mask])
+            vowel_f0_means.append(weighted_mean)
+        else:
+            vowel_f0_means.append(0.0)
+
+    return numpy.array(vowel_f0_means)
+
+
+def preprocess(d: InputData, is_eval: bool) -> OutputData:
+    """全ての変換・検証・配列化処理を統合"""
+    # F0とボリュームのデータを取得
+    f0 = d.f0_data.array
+    volume = d.volume_data.array
+
+    # リサンプリング
+    frame_rate = d.f0_data.rate
+    if abs(frame_rate - d.volume_data.rate) > 1e-4:
+        volume = d.volume_data.resample(
+            sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
+        )
+
+    # F0と音量の整合性チェック
+    # NOTE: 処理精度を考慮して3フレーム以内の誤差は許容する
+    if abs(len(f0) - len(volume)) > 3:
+        raise ValueError(
+            f"F0と音量データの長さが一致しません:\n"
+            f"  F0長:   {len(f0)}\n"
+            f"  音量長: {len(volume)}\n"
+            f"  許容範囲: 3フレーム以内"
+        )
+
+    # 長さを統一
+    frame_length = min(len(f0), len(volume))
+    f0 = f0[:frame_length]
+    volume = volume[:frame_length]
+
+    # 音素情報の抽出
+    phoneme_ids = numpy.array(
+        [ArpaPhoneme.phoneme_list.index(p.phoneme) for p in d.phonemes],
+        dtype=numpy.int32,
+    )
+    phoneme_durations = numpy.array(
+        [p.duration for p in d.phonemes], dtype=numpy.float32
+    )
+
+    # フレームレベルと音素レベルの整合性チェック
+    # NOTE: 処理精度を考慮して3フレーム以内の誤差は許容する
+    phoneme_duration = numpy.sum(phoneme_durations)
+    phoneme_frame_length = int(phoneme_duration * frame_rate)
+    if abs(frame_length - phoneme_frame_length) > 3:
+        raise ValueError(
+            f"LABファイルとフレーム数が一致しません:\n"
+            f"  フレーム数:     {frame_length}\n"
+            f"  音素フレーム数: {phoneme_frame_length}\n"
+            f"  許容範囲:      3フレーム以内"
+        )
+
+    # 母音とそのストレス値を抽出
+    vowel_indices = [
+        i
+        for i, phoneme in enumerate(d.phonemes)
+        if ArpaPhoneme.is_vowel(phoneme.phoneme)
+    ]
+
+    stress_values = []
+    for i in vowel_indices:
+        phoneme = d.phonemes[i]
+        if phoneme.stress is None:
+            raise ValueError(
+                f"母音 '{phoneme.phoneme}' にストレス値が設定されていません"
+            )
+        stress_values.append(phoneme.stress)
+
+    vowel_index = numpy.array(vowel_indices)
+    stress = numpy.array(stress_values)
+
+    # 母音ごとのF0重み付け平均を計算
+    vowel_f0_means = calculate_vowel_f0_weighted_mean(
+        f0=f0,
+        volume=volume,
+        vowel_index=vowel_index,
+        durations=phoneme_durations,
+        frame_rate=frame_rate,
+    )
+
+    # Tensor変換
     return OutputData(
-        feature_vector=torch.from_numpy(enhanced_feature).float(),
-        feature_variable=torch.from_numpy(d.feature_variable).float(),
-        target_vector=torch.tensor(target_class).long(),
-        target_scalar=torch.tensor(d.target_scalar).float(),
+        phoneme_id=torch.from_numpy(phoneme_ids).long(),
+        phoneme_duration=torch.from_numpy(phoneme_durations).float(),
+        f0=torch.from_numpy(f0).float(),
+        volume=torch.from_numpy(volume).float(),
+        vowel_f0_means=torch.from_numpy(vowel_f0_means).float(),
         speaker_id=torch.tensor(d.speaker_id).long(),
+        vowel_index=torch.from_numpy(vowel_index).long(),
+        stress=torch.from_numpy(stress).long(),
     )

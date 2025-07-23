@@ -103,9 +103,9 @@ data/
 ### 話者辞書形式
 ```json
 {
-  "speaker_001": 0,
-  "speaker_002": 1,
-  "speaker_003": 2
+  "speaker_001": ["utterance_001", "utterance_004", "utterance_007"],
+  "speaker_002": ["utterance_002", "utterance_005", "utterance_008"],
+  "speaker_003": ["utterance_003", "utterance_006", "utterance_009"]
 }
 ```
 
@@ -155,3 +155,4 @@ data/
 
 @docs/設計.md
 @docs/コーディング規約.md
+@.claude/hiho.md
