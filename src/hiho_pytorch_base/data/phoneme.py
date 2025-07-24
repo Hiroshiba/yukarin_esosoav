@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from collections.abc import Sequence
 from os import PathLike
 from pathlib import Path
 from typing import Self
