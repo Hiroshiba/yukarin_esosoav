@@ -2,8 +2,11 @@
 
 import torch
 from torch import Tensor, nn
+from torch.nn.utils.rnn import pad_sequence
 
 from hiho_pytorch_base.config import NetworkConfig
+from hiho_pytorch_base.network.conformer.encoder import Encoder
+from hiho_pytorch_base.network.transformer.utility import make_non_pad_mask
 
 
 class Predictor(nn.Module):
@@ -17,24 +20,19 @@ class Predictor(nn.Module):
         target_vector_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
+        encoder: Encoder,
     ):
         super().__init__()
 
-        self.variable_processor = nn.Linear(feature_variable_size, feature_vector_size)
         self.speaker_embedder = nn.Embedding(speaker_size, speaker_embedding_size)
 
-        self.main_layers = nn.Sequential(
-            nn.Linear(feature_vector_size + speaker_embedding_size, hidden_size),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-        )
+        input_size = feature_variable_size + speaker_embedding_size
+        self.pre_conformer = nn.Linear(input_size, hidden_size)
+        self.encoder = encoder
 
-        self.vector_head = nn.Linear(hidden_size, target_vector_size)
-
-        self.scalar_head = nn.Linear(hidden_size, 1)
+        self.feature_vector_processor = nn.Linear(feature_vector_size, hidden_size)
+        self.vector_head = nn.Linear(hidden_size * 2, target_vector_size)
+        self.scalar_head = nn.Linear(hidden_size * 2, 1)
 
     def forward(  # noqa: D102
         self,
@@ -43,30 +41,65 @@ class Predictor(nn.Module):
         feature_variable_list: list[Tensor],  # [(vL, ?)]
         speaker_id: Tensor,  # (B,)
     ) -> tuple[Tensor, Tensor]:  # (B, ?), (B,)
-        variable_means = []
-        for var_data in feature_variable_list:  # (vL, ?)
-            var_mean = torch.mean(var_data, dim=0)  # (?)
-            var_processed = self.variable_processor(var_mean)  # (?)
-            variable_means.append(var_processed)
+        device = feature_vector.device
+        batch_size = feature_vector.size(0)
 
-        variable_features = torch.stack(variable_means)  # (B, ?)
-        combined_features = feature_vector + variable_features  # (B, ?)
+        lengths = torch.tensor(
+            [var_data.shape[0] for var_data in feature_variable_list], device=device
+        )
+
+        padded_variable = pad_sequence(
+            feature_variable_list, batch_first=True
+        )  # (B, L, ?)
 
         speaker_embedding = self.speaker_embedder(speaker_id)  # (B, ?)
-        final_features = torch.cat(
-            [combined_features, speaker_embedding], dim=1
-        )  # (B, ?)
 
-        hidden = self.main_layers(final_features)  # (B, ?)
+        max_length = padded_variable.size(1)
+        speaker_expanded = speaker_embedding.unsqueeze(1).expand(
+            batch_size, max_length, -1
+        )  # (B, L, ?)
 
-        vector_output = self.vector_head(hidden)  # (B, ?)
-        scalar_output = self.scalar_head(hidden).squeeze(-1)  # (B,)
+        combined_variable = torch.cat(
+            [padded_variable, speaker_expanded], dim=2
+        )  # (B, L, ?)
+
+        h = self.pre_conformer(combined_variable)  # (B, L, ?)
+
+        mask = make_non_pad_mask(lengths).unsqueeze(-2).to(device)  # (B, 1, L)
+
+        encoded, _ = self.encoder(x=h, cond=None, mask=mask)  # (B, L, ?)
+
+        mask_expanded = mask.squeeze(-2).unsqueeze(-1)  # (B, L, 1)
+        masked_encoded = encoded * mask_expanded  # (B, L, ?)
+        variable_sum = masked_encoded.sum(dim=1)  # (B, ?)
+        variable_mean = variable_sum / lengths.unsqueeze(-1).float()  # (B, ?)
+
+        fixed_features = self.feature_vector_processor(feature_vector)  # (B, ?)
+
+        final_features = torch.cat([fixed_features, variable_mean], dim=1)  # (B, ?)
+
+        vector_output = self.vector_head(final_features)  # (B, ?)
+        scalar_output = self.scalar_head(final_features).squeeze(-1)  # (B,)
 
         return vector_output, scalar_output
 
 
 def create_predictor(config: NetworkConfig) -> Predictor:
     """設定からPredictorを作成"""
+    encoder = Encoder(
+        hidden_size=config.hidden_size,
+        condition_size=0,
+        block_num=config.conformer_block_num,
+        dropout_rate=config.conformer_dropout_rate,
+        positional_dropout_rate=config.conformer_dropout_rate,
+        attention_head_size=8,
+        attention_dropout_rate=config.conformer_dropout_rate,
+        use_macaron_style=True,
+        use_conv_glu_module=True,
+        conv_glu_module_kernel_size=31,
+        feed_forward_hidden_size=config.hidden_size * 4,
+        feed_forward_kernel_size=3,
+    )
     return Predictor(
         feature_vector_size=config.feature_vector_size,
         feature_variable_size=config.feature_variable_size,
@@ -74,4 +107,5 @@ def create_predictor(config: NetworkConfig) -> Predictor:
         target_vector_size=config.target_vector_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
+        encoder=encoder,
     )

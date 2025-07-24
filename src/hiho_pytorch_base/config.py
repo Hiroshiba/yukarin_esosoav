@@ -38,6 +38,8 @@ class NetworkConfig(BaseModel):
     feature_variable_size: int
     hidden_size: int
     target_vector_size: int
+    conformer_block_num: int
+    conformer_dropout_rate: float
     speaker_size: int
     speaker_embedding_size: int
 
