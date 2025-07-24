@@ -8,55 +8,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 主なコンポーネント
 
-### 設定管理
-- `src/hiho_pytorch_base/config.py`: Pydantic BaseModelベースの設定管理
-  - `DataFileConfig`: データファイルパス設定（feature_vector_pathlist_path、feature_variable_pathlist_path、target_vector_pathlist_path、target_scalar_pathlist_path、speaker_dict_path、root_dir）
-  - `DatasetConfig`: データセット設定（train_file、valid_file、test_num等）
-  - `NetworkConfig`: ネットワーク設定（feature_vector_size、feature_variable_size、hidden_size、target_vector_size、speaker_size、speaker_embedding_size）
-  - `TrainConfig`: 学習設定（batch_size、optimizer、scheduler、use_gpu等）
-  - `ProjectConfig`: プロジェクト設定（name、tags、category）
+### 設定管理 (`src/hiho_pytorch_base/config.py`)
+```python
+DataFileConfig:     # ファイルパス設定
+DatasetConfig:      # データセット分割設定
+NetworkConfig:      # ネットワーク構造設定
+ModelConfig:        # モデル設定
+TrainConfig:        # 学習パラメータ設定
+ProjectConfig:      # プロジェクト情報設定
+```
 
-### 学習システム
-- `scripts/train.py`: 独自実装のPyTorch学習ループ
-  - `train()`: 設定から学習プロセスを実行
-  - TensorBoard統合
-  - torch.amp（Automatic Mixed Precision）対応
-  - 学習済みモデル・スナップショット保存
-  - エポックベースの学習スケジューリング
+### 学習システム (`scripts/train.py`)
+- PyTorch独自実装の学習ループ
+- TensorBoard/W&B統合
+- torch.amp（Automatic Mixed Precision）対応
+- エポックベーススケジューラー対応
+- スナップショット保存・復旧機能
 
-### データ処理
-- `src/hiho_pytorch_base/data/data.py`: F0予測用データ構造
-  - `InputData`: 音素特徴量、可変長特徴量、F0ターゲット、スカラー値、話者ID
-  - `OutputData`: Tensor変換後のデータ構造
-  - `preprocess()`: データ前処理（可変長特徴量の平均化等）
-- `src/hiho_pytorch_base/dataset.py`: データセット処理
-  - pathlistファイル方式でのファイル管理
-  - ステムベースのファイル対応付け
-  - 遅延読み込み対応（LazyInputData）
-  - データタイプ別ディレクトリ管理（feature_vector/、feature_variable/、target_vector/、target_scalar/）
+### データ処理 (`src/hiho_pytorch_base/dataset.py`)
+- 4種類のデータタイプの統一処理
+- 遅延読み込みによるメモリ効率化
+- dataclassベースの型安全なデータ構造
+- train/test/eval/valid の4種類データセット対応
+- pathlistファイル方式によるファイル管理
+- stemベース対応付けで異なるデータタイプを自動関連付け
+- 多話者学習対応（JSON形式の話者マッピング）
 
-### モデル・ネットワーク
-- `src/hiho_pytorch_base/network/predictor.py`: F0予測ネットワーク
-  - `Predictor`: 可変長特徴量処理と話者埋め込み対応
-  - マルチヘッド出力（vector_head、scalar_head）
-  - dropout、ReLU活性化を含む3層MLP
-- `src/hiho_pytorch_base/model.py`: 損失計算
-  - `Model`: 分類・回帰両方の損失計算
-  - cross_entropyとMSE損失の組み合わせ
-  - 精度計算機能
+### ネットワーク (`src/hiho_pytorch_base/network/predictor.py`)
+- マルチタスク予測器
+- 固定長・可変長データの統一処理
+- マルチヘッド出力対応
 
 ### 推論・生成
-- `src/hiho_pytorch_base/generator.py`: 学習済みモデルからのF0予測
-- `scripts/generate.py`: 推論スクリプト
+- `src/hiho_pytorch_base/generator.py`: 推論ジェネレーター
+- `scripts/generate.py`: 推論実行スクリプト
 
-## 主要なファイル
+### テストシステム
+- 自動テストデータ生成
+- エンドツーエンドテスト
+- 統合テスト
+
+## 使用方法
 
 ### 学習実行
 ```bash
 uv run -m scripts.train <config_yaml_path> <output_dir>
 ```
 
-### 生成実行
+### 推論実行
 ```bash
 uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
 ```
@@ -76,56 +75,23 @@ uv sync
 uv run pyright && uv run ruff check --fix && uv run ruff format
 ```
 
-## 設定ファイル形式
+## 技術仕様
 
-YAML形式で設定を管理
+### 設定ファイル
+- **形式**: YAML
+- **管理**: Pydanticによる型安全な設定
 
-## データ形式
+### 主な依存関係
+- **Python**: 3.12+
+- **PyTorch**: 2.7.1+
+- **NumPy**: 2.2.5+
+- **Pydantic**: 2.11.7+
+- **librosa**: 0.11.0+（音声処理）
+- その他詳細は`pyproject.toml`を参照
 
-### パスリスト形式
-データファイルへのパスをroot_dirからの相対パスで記載：
-```
-feature_vector/utterance_001.npy
-feature_vector/utterance_002.npy
-feature_vector/utterance_003.npy
-```
-
-### ディレクトリ構造
-```
-data/
-├── feature_vector/     # 音素特徴量
-├── feature_variable/   # 可変長特徴量（アクセント情報等）
-├── target_vector/      # F0予測ターゲット
-├── target_scalar/      # スカラー値
-└── speaker_dict.json   # 話者辞書
-```
-
-### 話者辞書形式
-```json
-{
-  "speaker_001": ["utterance_001", "utterance_004", "utterance_007"],
-  "speaker_002": ["utterance_002", "utterance_005", "utterance_008"],
-  "speaker_003": ["utterance_003", "utterance_006", "utterance_009"]
-}
-```
-
-## 依存関係
-
-### メイン依存関係
-- numpy>=2.3.1
-- torch>=2.7.1
-- pydantic>=2.11.7
-- pyyaml>=6.0.2
-- tqdm>=4.67.1
-- torch-optimizer>=0.3.0
-
-### 開発依存関係
-- pytest>=8.4.1
-- ruff>=0.12.2
-- tensorboard>=2.19.0
-- wandb>=0.21.0
-
-## 開発ガイドライン
+### パッケージ管理
+- **uv**による高速パッケージ管理
+- **pyproject.toml**ベースの依存関係管理
 
 ### コーディング規約
 - **フォーマッター**: ruffを使用
@@ -139,17 +105,23 @@ data/
 - **pathlist方式**: root_dirからの相対パスでファイル管理
 - **データタイプ別ディレクトリ**: 各データタイプごとに独立したディレクトリ
 
-### 学習システム
-- **エポックベース**: スケジューラーはエポック単位で実行
-- **マルチタスク学習**: 分類（target_vector）と回帰（target_scalar）を同時学習
-- **多話者対応**: 話者埋め込みを使用した多話者F0予測
+- **環境のみ提供**: Dockerfileは依存関係とライブラリのインストールのみを行い、学習コードや推論コードは含みません
+- **Git Clone前提**: 実際の利用時は、コンテナ内でGit cloneを実行してコードを取得することを想定しています
+- **最新依存関係**: 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）に準拠し、最新のCUDA/PyTorchベースイメージを使用
+- **音声処理対応**: libsoundfile1-dev、libasound2-dev等の音声処理ライブラリの整備方法をコメント等で案内
+- **uv使用**: pyproject.tomlベースの依存関係管理にuvを使用し、高速なパッケージインストールを実現
 
-## 注意事項
+## フォーク時の拡張例
 
-- **データ形式**: F0予測のためのマルチタイプデータ（feature_vector, feature_variable, target_vector, target_scalar）を使用
-- **話者管理**: speaker_dict.jsonで話者IDとラベルを管理
-- **可変長データ**: feature_variableは可変長データとして処理される
-- **パスリスト**: root_dirからの相対パス形式でファイルパスを管理する
+このフレームワークを拡張する際の参考：
+
+1. **新しいネットワークアーキテクチャ**: `network/`ディレクトリに追加
+2. **カスタム損失関数**: `model.py`の拡張
+3. **異なるデータ形式**: データローダーの拡張
+
+### 参考プロジェクト
+- 以下のプロジェクトの実装パターンを参考にしている
+- `../yukarin_sosoa`、`../yukarin_sosfd`、`../accent_estimator`
 
 ---
 
