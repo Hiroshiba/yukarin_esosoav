@@ -27,7 +27,6 @@ ProjectConfig:      # プロジェクト情報設定
 - スナップショット保存・復旧機能
 
 ### データ処理 (`src/hiho_pytorch_base/dataset.py`)
-- 4種類のデータタイプの統一処理
 - 遅延読み込みによるメモリ効率化
 - dataclassベースの型安全なデータ構造
 - train/test/eval/valid の4種類データセット対応
