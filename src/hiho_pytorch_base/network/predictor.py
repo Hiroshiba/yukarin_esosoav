@@ -32,6 +32,7 @@ class Predictor(nn.Module):
 
         self.feature_vector_processor = nn.Linear(feature_vector_size, hidden_size)
         self.vector_head = nn.Linear(hidden_size * 2, target_vector_size)
+        self.variable_head = nn.Linear(hidden_size, target_vector_size)
         self.scalar_head = nn.Linear(hidden_size * 2, 1)
 
     def forward(  # noqa: D102
@@ -40,7 +41,7 @@ class Predictor(nn.Module):
         feature_vector: Tensor,  # (B, ?)
         feature_variable_list: list[Tensor],  # [(vL, ?)]
         speaker_id: Tensor,  # (B,)
-    ) -> tuple[Tensor, Tensor]:  # (B, ?), (B,)
+    ) -> tuple[Tensor, list[Tensor], Tensor]:  # (B, ?), [(vL, ?)], (B,)
         device = feature_vector.device
         batch_size = feature_vector.size(0)
 
@@ -69,6 +70,8 @@ class Predictor(nn.Module):
 
         encoded, _ = self.encoder(x=h, cond=None, mask=mask)  # (B, L, ?)
 
+        variable_features = self.variable_head(encoded)  # (B, L, ?)
+
         mask_expanded = mask.squeeze(-2).unsqueeze(-1)  # (B, L, 1)
         masked_encoded = encoded * mask_expanded  # (B, L, ?)
         variable_sum = masked_encoded.sum(dim=1)  # (B, ?)
@@ -81,7 +84,11 @@ class Predictor(nn.Module):
         vector_output = self.vector_head(final_features)  # (B, ?)
         scalar_output = self.scalar_head(final_features).squeeze(-1)  # (B,)
 
-        return vector_output, scalar_output
+        variable_output_list = [
+            variable_features[i, :length] for i, length in enumerate(lengths)
+        ]
+
+        return vector_output, variable_output_list, scalar_output
 
 
 def create_predictor(config: NetworkConfig) -> Predictor:

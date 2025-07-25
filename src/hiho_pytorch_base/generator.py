@@ -18,6 +18,7 @@ class GeneratorOutput:
     """生成したデータ"""
 
     vector_output: Tensor  # (B, ?)
+    variable_output_list: list[Tensor]  # [(L, ?)]
     scalar_output: Tensor  # (B,)
 
 
@@ -74,6 +75,7 @@ class Generator(nn.Module):
 
         (
             vector_output,  # (B, ?)
+            variable_output_list,  # [(L, ?)]
             scalar_output,  # (B,)
         ) = self.predictor(
             feature_vector=_convert(feature_vector),
@@ -81,4 +83,8 @@ class Generator(nn.Module):
             speaker_id=_convert(speaker_id),
         )
 
-        return GeneratorOutput(vector_output=vector_output, scalar_output=scalar_output)
+        return GeneratorOutput(
+            vector_output=vector_output,
+            variable_output_list=variable_output_list,
+            scalar_output=scalar_output,
+        )

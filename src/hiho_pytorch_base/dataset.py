@@ -23,6 +23,7 @@ class LazyInputData:
     feature_vector_path: Path
     feature_variable_path: Path
     target_vector_path: Path
+    target_variable_path: Path
     target_scalar_path: Path
     speaker_id: int
 
@@ -32,6 +33,7 @@ class LazyInputData:
             feature_vector=numpy.load(self.feature_vector_path, allow_pickle=True),
             feature_variable=numpy.load(self.feature_variable_path, allow_pickle=True),
             target_vector=SamplingData.load(self.target_vector_path),
+            target_variable=SamplingData.load(self.target_variable_path),
             target_scalar=float(numpy.load(self.target_scalar_path, allow_pickle=True)),
             speaker_id=self.speaker_id,
         )
@@ -159,6 +161,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             feature_vector_pathmappings,
             feature_variable_pathmappings,
             target_vector_pathmappings,
+            target_variable_pathmappings,
             target_scalar_pathmappings,
         ),
     ) = get_data_paths(
@@ -167,6 +170,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             config.feature_vector_pathlist_path,
             config.feature_variable_pathlist_path,
             config.target_vector_pathlist_path,
+            config.target_variable_pathlist_path,
             config.target_scalar_pathlist_path,
         ],
     )
@@ -185,6 +189,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             feature_vector_path=feature_vector_pathmappings[fn],
             feature_variable_path=feature_variable_pathmappings[fn],
             target_vector_path=target_vector_pathmappings[fn],
+            target_variable_path=target_variable_pathmappings[fn],
             target_scalar_path=target_scalar_pathmappings[fn],
             speaker_id=speaker_ids[fn],
         )

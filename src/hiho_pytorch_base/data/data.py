@@ -16,6 +16,7 @@ class InputData:
     feature_vector: numpy.ndarray
     feature_variable: numpy.ndarray
     target_vector: SamplingData
+    target_variable: SamplingData
     target_scalar: float
     speaker_id: int
 
@@ -27,6 +28,7 @@ class OutputData:
     feature_vector: Tensor
     feature_variable: Tensor
     target_vector: Tensor
+    target_variable: Tensor
     target_scalar: Tensor
     speaker_id: Tensor
 
@@ -43,15 +45,18 @@ def preprocess(
             numpy.random.default_rng().normal(size=enhanced_feature.shape) * 0.01
         )
 
-    resampled_data = d.target_vector.resample(
+    resampled_vector_data = d.target_vector.resample(
         sampling_rate=frame_rate, length=frame_length
     )
-    target_class = numpy.bincount(resampled_data[:, 0]).argmax()
+    target_class = numpy.bincount(resampled_vector_data[:, 0]).argmax()
+
+    target_sequence = d.target_variable.array.astype(numpy.float32)
 
     return OutputData(
         feature_vector=torch.from_numpy(enhanced_feature).float(),
         feature_variable=torch.from_numpy(d.feature_variable).float(),
         target_vector=torch.tensor(target_class).long(),
+        target_variable=torch.from_numpy(target_sequence).float(),
         target_scalar=torch.tensor(d.target_scalar).float(),
         speaker_id=torch.tensor(d.speaker_id).long(),
     )

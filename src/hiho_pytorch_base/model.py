@@ -20,6 +20,7 @@ class ModelOutput(DataNumProtocol):
     """逆伝播させる損失"""
 
     loss_vector: Tensor
+    loss_variable: Tensor
     loss_scalar: Tensor
     accuracy: Tensor
 
@@ -47,6 +48,7 @@ class Model(nn.Module):
         """データをネットワークに入力して損失などを計算する"""
         (
             vector_output,  # (B, ?)
+            variable_output_list,  # [(L, ?)]
             scalar_output,  # (B,)
         ) = self.predictor(
             feature_vector=batch.feature_vector,
@@ -55,16 +57,20 @@ class Model(nn.Module):
         )
 
         target_vector = batch.target_vector  # (B,)
+        variable_output = torch.cat(variable_output_list)
+        target_variable = torch.cat(batch.target_variable_list)
         target_scalar = batch.target_scalar  # (B,)
 
         loss_vector = cross_entropy(vector_output, target_vector)
+        loss_variable = mse_loss(variable_output, target_variable)
         loss_scalar = mse_loss(scalar_output, target_scalar)
-        total_loss = loss_vector + loss_scalar
+        total_loss = loss_vector + loss_variable + loss_scalar
         acc = accuracy(vector_output, target_vector)
 
         return ModelOutput(
             loss=total_loss,
             loss_vector=loss_vector,
+            loss_variable=loss_variable,
             loss_scalar=loss_scalar,
             accuracy=acc,
             data_num=batch.data_num,

@@ -14,6 +14,7 @@ class DataFileConfig(BaseModel):
     feature_vector_pathlist_path: Path
     feature_variable_pathlist_path: Path
     target_vector_pathlist_path: Path
+    target_variable_pathlist_path: Path
     target_scalar_pathlist_path: Path
     speaker_dict_path: Path
     root_dir: Path | None

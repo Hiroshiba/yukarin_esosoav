@@ -33,15 +33,14 @@ class Evaluator(nn.Module):
     @torch.no_grad()
     def forward(self, batch: BatchOutput) -> EvaluatorOutput:
         """データをネットワークに入力して評価値を計算する"""
-        feature_vector = batch.feature_vector  # (B, ?)
-        feature_variable_list = batch.feature_variable_list  # [(vL, ?)]
         target = batch.target_vector  # (B,)
 
         output_result: GeneratorOutput = self.generator(
-            feature_vector=feature_vector,
-            feature_variable_list=feature_variable_list,
+            feature_vector=batch.feature_vector,
+            feature_variable_list=batch.feature_variable_list,
             speaker_id=batch.speaker_id,
         )
+
         output = output_result.vector_output  # (B, ?)
 
         loss = torch.nn.functional.cross_entropy(output, target)

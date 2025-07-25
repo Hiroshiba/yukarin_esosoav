@@ -49,6 +49,11 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
         if not valid_pathlist_path.exists():
             valid_pathlist_path.write_text("\n".join(all_relative_paths[train_num:]))
 
+    # 可変長データの長さを事前に決定
+    variable_lengths = {}
+    for stem in all_stems:
+        variable_lengths[stem] = int(np.random.default_rng().integers(5, 15))
+
     # 固定長特徴ベクトル
     def generate_feature_vector(file_path: Path) -> None:
         feature_vector = (
@@ -62,7 +67,8 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
 
     # 可変長特徴データ
     def generate_feature_variable(file_path: Path) -> None:
-        variable_length = int(np.random.default_rng().integers(5, 15))
+        stem = file_path.stem
+        variable_length = variable_lengths[stem]
         feature_variable = (
             np.random.default_rng()
             .normal(size=(variable_length, config.network.feature_variable_size))
@@ -82,6 +88,20 @@ def setup_data_and_config(base_config_path: Path, data_dir: Path) -> Config:
         sampling_data.save(file_path)
 
     _setup_data(generate_target_vector, "target_vector", "npy")
+
+    # 可変長回帰ターゲット
+    def generate_target_variable(file_path: Path) -> None:
+        stem = file_path.stem
+        variable_length = variable_lengths[stem]
+        array = (
+            np.random.default_rng()
+            .normal(size=(variable_length, config.network.target_vector_size))
+            .astype(np.float32)
+        )
+        sampling_data = SamplingData(array=array, rate=1.0)
+        sampling_data.save(file_path)
+
+    _setup_data(generate_target_variable, "target_variable", "npy")
 
     # 回帰ターゲット
     def generate_target_scalar(file_path: Path) -> None:

@@ -15,6 +15,7 @@ class BatchOutput:
     feature_vector: Tensor  # (B, ?)
     feature_variable_list: list[Tensor]  # [(L, ?)]
     target_vector: Tensor  # (B, ?)
+    target_variable_list: list[Tensor]  # [(L, ?)]
     target_scalar: Tensor  # (B,)
     speaker_id: Tensor  # (B,)
 
@@ -43,6 +44,7 @@ def collate_dataset_output(data_list: list[OutputData]) -> BatchOutput:
         feature_vector=collate_stack([d.feature_vector for d in data_list]),
         feature_variable_list=collate_list([d.feature_variable for d in data_list]),
         target_vector=collate_stack([d.target_vector for d in data_list]),
+        target_variable_list=collate_list([d.target_variable for d in data_list]),
         target_scalar=collate_stack([d.target_scalar for d in data_list]),
         speaker_id=collate_stack([d.speaker_id for d in data_list]),
     )
