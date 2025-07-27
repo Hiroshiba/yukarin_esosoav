@@ -24,6 +24,15 @@ class Predictor(nn.Module):
         self.hidden_size = hidden_size
 
         self.phoneme_embedder = nn.Embedding(phoneme_size, hidden_size)
+
+        # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
+        self.phoneme_transform = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+        )
+
         self.speaker_embedder = nn.Embedding(speaker_size, speaker_embedding_size)
 
         # 適当な線形層の組み合わせ
@@ -32,7 +41,10 @@ class Predictor(nn.Module):
         )  # 音素埋め込み + 話者埋め込み + F0平均 + Volume平均
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size // 2)
-        self.fc3 = nn.Linear(hidden_size // 2, 1)  # 1次元出力（F0予測用）
+
+        # 出力ヘッド
+        self.f0_head = nn.Linear(hidden_size // 2, 1)  # F0予測用
+        self.vuv_head = nn.Linear(hidden_size // 2, 1)  # VUV予測用
 
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.1)
@@ -45,13 +57,14 @@ class Predictor(nn.Module):
         f0_data: Tensor,  # (B, T)
         volume_data: Tensor,  # (B, T)
         speaker_id: Tensor,  # (B,)
-    ) -> Tensor:  # (B,)
+    ) -> tuple[Tensor, Tensor]:  # (B,), (B,)
         # 音素埋め込みの平均を計算（超雑）
-        phoneme_embed = self.phoneme_embedder(lab_phoneme_ids)  # (B, L, hidden_size)
-        phoneme_mean = torch.mean(phoneme_embed, dim=1)  # (B, hidden_size)
+        phoneme_embed = self.phoneme_embedder(lab_phoneme_ids)  # (B, L, ?)
+        phoneme_embed = self.phoneme_transform(phoneme_embed)  # (B, L, ?)
+        phoneme_mean = torch.mean(phoneme_embed, dim=1)  # (B, ?)
 
         # 話者埋め込み
-        speaker_embed = self.speaker_embedder(speaker_id)  # (B, speaker_embedding_size)
+        speaker_embed = self.speaker_embedder(speaker_id)  # (B, ?)
 
         # F0とVolumeの平均を計算（超雑）
         f0_mean = torch.mean(f0_data, dim=1).squeeze(-1).unsqueeze(-1)  # (B, 1)
@@ -60,16 +73,18 @@ class Predictor(nn.Module):
         # 全部をconcatenate
         features = torch.cat(
             [phoneme_mean, speaker_embed, f0_mean, volume_mean], dim=1
-        )  # (B, input_size)
+        )  # (B, ?)
 
         # 適当な線形層を通す
         h = self.relu(self.fc1(features))
         h = self.dropout(h)
         h = self.relu(self.fc2(h))
         h = self.dropout(h)
-        output = self.fc3(h).squeeze(-1)  # (B,)
 
-        return output
+        f0_output = self.f0_head(h).squeeze(-1)  # (B,)
+        vuv_output = self.vuv_head(h).squeeze(-1)  # (B,)
+
+        return f0_output, vuv_output
 
 
 def create_predictor(config: NetworkConfig) -> Predictor:

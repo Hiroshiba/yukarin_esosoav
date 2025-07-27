@@ -18,7 +18,8 @@ class BatchOutput:
     lab_durations: Tensor  # (B, L)
     f0_data: Tensor  # (B, T)
     volume_data: Tensor  # (B, T)
-    vowel_f0_means: Tensor  # (B, V)
+    vowel_f0_means: Tensor  # (B, vL)
+    vowel_voiced: Tensor  # (B, vL)
     speaker_id: Tensor  # (B,)
 
     @property
@@ -72,5 +73,6 @@ def collate_dataset_output(data_list: list[OutputData]) -> BatchOutput:
         f0_data=collate_stack([d.f0 for d in data_list]),
         volume_data=collate_stack([d.volume for d in data_list]),
         vowel_f0_means=collate_stack([d.vowel_f0_means for d in data_list]),
+        vowel_voiced=collate_stack([d.vowel_voiced for d in data_list]),
         speaker_id=collate_stack([d.speaker_id for d in data_list]),
     )

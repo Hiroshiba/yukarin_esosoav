@@ -29,6 +29,7 @@ class OutputData:
     f0: Tensor  # F0
     volume: Tensor  # 音量
     vowel_f0_means: Tensor  # 各母音のF0
+    vowel_voiced: Tensor  # 各母音が有声か
     vowel_index: Tensor  # 音素列のなかで母音のインデックス
     stress: Tensor  # 母音ごとのストレス値（0, 1, 2）
     speaker_id: Tensor
@@ -160,6 +161,9 @@ def preprocess(d: InputData, is_eval: bool) -> OutputData:
         frame_rate=frame_rate,
     )
 
+    # 有声か
+    vowel_voiced = vowel_f0_means > 0
+
     # Tensor変換
     return OutputData(
         phoneme_id=torch.from_numpy(phoneme_ids).long(),
@@ -167,6 +171,7 @@ def preprocess(d: InputData, is_eval: bool) -> OutputData:
         f0=torch.from_numpy(f0).float(),
         volume=torch.from_numpy(volume).float(),
         vowel_f0_means=torch.from_numpy(vowel_f0_means).float(),
+        vowel_voiced=torch.from_numpy(vowel_voiced).bool(),
         speaker_id=torch.tensor(d.speaker_id).long(),
         vowel_index=torch.from_numpy(vowel_index).long(),
         stress=torch.from_numpy(stress).long(),

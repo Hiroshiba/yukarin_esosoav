@@ -16,7 +16,7 @@ class EvaluatorOutput(DataNumProtocol):
     """評価値"""
 
     loss: Tensor
-    accuracy: Tensor
+    vuv_accuracy: Tensor
 
 
 def calculate_value(output: EvaluatorOutput) -> Tensor:
@@ -37,7 +37,8 @@ class Evaluator(nn.Module):
         # TODO: 適当な実装なので変更する
 
         # ターゲットとして母音F0の平均を使用
-        target_f0 = batch.vowel_f0_means.mean(dim=1)  # (B, V) -> (B,)
+        target_f0 = batch.vowel_f0_means.mean(dim=1)  # (B, vL) -> (B,)
+        target_vuv = batch.vowel_voiced.any(dim=1)  # (B, vL) -> (B,)
 
         output_result: GeneratorOutput = self.generator(
             lab_phoneme_ids=batch.lab_phoneme_ids,
@@ -46,17 +47,18 @@ class Evaluator(nn.Module):
             volume_data=batch.volume_data,
             speaker_id=batch.speaker_id,
         )
-        predicted_f0 = output_result.f0_output  # (B,)
+        predicted_f0 = output_result.f0  # (B,)
+        predicted_vuv = output_result.vuv  # (B,)
 
         # MSE損失を計算
         loss = mse_loss(predicted_f0, target_f0)
 
-        # 適当な精度指標（相対誤差の逆数）
-        relative_error = torch.abs(predicted_f0 - target_f0) / (target_f0 + 1e-8)
-        accuracy = 1.0 / (1.0 + torch.mean(relative_error))
+        # 有声かどうかの精度
+        predicted_vuv_binary = predicted_vuv > 0.0
+        vuv_accuracy = (predicted_vuv_binary == target_vuv).float().mean()
 
         return EvaluatorOutput(
             loss=loss,
-            accuracy=accuracy,
+            vuv_accuracy=vuv_accuracy,
             data_num=batch.data_num,
         )
