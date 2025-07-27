@@ -26,20 +26,26 @@ class Predictor(nn.Module):
 
         self.hidden_size = hidden_size
 
-        self.phoneme_embedder = nn.Embedding(phoneme_size, hidden_size)
-        self.stress_embedder = nn.Embedding(
-            4, stress_embedding_size
-        )  # 子音=0, 母音=1-3
-
         # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
-        self.phoneme_transform = nn.Sequential(
+        self.phoneme_embedder = nn.Sequential(
+            nn.Embedding(phoneme_size, hidden_size),
             nn.Linear(hidden_size, hidden_size),
             nn.Linear(hidden_size, hidden_size),
             nn.Linear(hidden_size, hidden_size),
             nn.Linear(hidden_size, hidden_size),
         )
+        self.stress_embedder = nn.Embedding(
+            4, stress_embedding_size
+        )  # 子音=0, 母音=1-3
 
-        self.speaker_embedder = nn.Embedding(speaker_size, speaker_embedding_size)
+        # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
+        self.speaker_embedder = nn.Sequential(
+            nn.Embedding(speaker_size, speaker_embedding_size),
+            nn.Linear(speaker_embedding_size, speaker_embedding_size),
+            nn.Linear(speaker_embedding_size, speaker_embedding_size),
+            nn.Linear(speaker_embedding_size, speaker_embedding_size),
+            nn.Linear(speaker_embedding_size, speaker_embedding_size),
+        )
 
         # 継続時間写像（オプション）
         self.duration_linear = (
@@ -86,7 +92,6 @@ class Predictor(nn.Module):
 
         # 埋め込み
         phoneme_embed = self.phoneme_embedder(padded_phoneme_ids)  # (B, L, ?)
-        phoneme_embed = self.phoneme_transform(phoneme_embed)  # (B, L, ?)
         stress_embed = self.stress_embedder(padded_phoneme_stress)  # (B, L, ?)
 
         # 話者埋め込み
