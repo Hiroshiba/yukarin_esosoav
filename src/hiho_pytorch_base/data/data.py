@@ -24,14 +24,14 @@ class InputData:
 class OutputData:
     """データ処理後のデータ構造"""
 
-    phoneme_id: Tensor  # 音素ID
-    phoneme_duration: Tensor  # 音素継続時間
-    f0: Tensor  # F0
-    volume: Tensor  # 音量
-    vowel_f0_means: Tensor  # 各母音のF0
-    vowel_voiced: Tensor  # 各母音が有声か
-    vowel_index: Tensor  # 音素列のなかで母音のインデックス
-    stress: Tensor  # 母音ごとのストレス値（0, 1, 2）
+    phoneme_id: Tensor  # (L,) 音素ID
+    phoneme_duration: Tensor  # (L,) 音素継続時間
+    phoneme_stress: Tensor  # (L,) 全音素のストレス値（子音=0、母音=1-3）
+    f0: Tensor  # (T,) F0
+    volume: Tensor  # (T,) 音量
+    vowel_f0_means: Tensor  # (vL,) 各母音のF0
+    vowel_voiced: Tensor  # (vL,) 各母音が有声か
+    vowel_index: Tensor  # (vL,) 音素列のなかで母音のインデックス
     speaker_id: Tensor
 
 
@@ -140,17 +140,21 @@ def preprocess(d: InputData, is_eval: bool) -> OutputData:
         if ArpaPhoneme.is_vowel(phoneme.phoneme)
     ]
 
-    stress_values = []
-    for i in vowel_indices:
-        phoneme = d.phonemes[i]
-        if phoneme.stress is None:
-            raise ValueError(
-                f"母音 '{phoneme.phoneme}' にストレス値が設定されていません"
-            )
-        stress_values.append(phoneme.stress)
+    # 全音素のストレス値を作成（子音=0、母音=1-3）
+    phoneme_stresses = []
+    for phoneme in d.phonemes:
+        if ArpaPhoneme.is_vowel(phoneme.phoneme):
+            if phoneme.stress is None:
+                raise ValueError(
+                    f"母音 '{phoneme.phoneme}' にストレス値が設定されていません"
+                )
+            stress_value = phoneme.stress + 1  # 0,1,2 -> 1,2,3
+            phoneme_stresses.append(stress_value)
+        else:
+            phoneme_stresses.append(0)  # 子音は0
 
     vowel_index = numpy.array(vowel_indices)
-    stress = numpy.array(stress_values)
+    phoneme_stress = numpy.array(phoneme_stresses)
 
     # 母音ごとのF0重み付け平均を計算
     vowel_f0_means = calculate_vowel_f0_weighted_mean(
@@ -168,11 +172,11 @@ def preprocess(d: InputData, is_eval: bool) -> OutputData:
     return OutputData(
         phoneme_id=torch.from_numpy(phoneme_ids).long(),
         phoneme_duration=torch.from_numpy(phoneme_durations).float(),
+        phoneme_stress=torch.from_numpy(phoneme_stress).long(),
         f0=torch.from_numpy(f0).float(),
         volume=torch.from_numpy(volume).float(),
         vowel_f0_means=torch.from_numpy(vowel_f0_means).float(),
         vowel_voiced=torch.from_numpy(vowel_voiced).bool(),
-        speaker_id=torch.tensor(d.speaker_id).long(),
         vowel_index=torch.from_numpy(vowel_index).long(),
-        stress=torch.from_numpy(stress).long(),
+        speaker_id=torch.tensor(d.speaker_id).long(),
     )

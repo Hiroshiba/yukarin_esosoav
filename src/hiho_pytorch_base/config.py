@@ -37,6 +37,8 @@ class NetworkConfig(BaseModel):
     conformer_dropout_rate: float
     speaker_size: int
     speaker_embedding_size: int
+    stress_embedding_size: int
+    input_phoneme_duration: bool
 
 
 class ModelConfig(BaseModel):

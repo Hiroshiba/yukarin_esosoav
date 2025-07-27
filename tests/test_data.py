@@ -71,7 +71,7 @@ def assert_output_data_types(output_data: OutputData) -> None:
     assert output_data.vowel_f0_means.dtype == torch.float
     assert output_data.speaker_id.dtype == torch.long
     assert output_data.vowel_index.dtype == torch.long
-    assert output_data.stress.dtype == torch.long
+    assert output_data.phoneme_stress.dtype == torch.long
 
 
 def test_arpa_phoneme_classification():
@@ -117,9 +117,11 @@ def test_new_input_data_structure():
     assert_output_data_types(output_data)
 
     assert len(output_data.vowel_index) == 1
-    assert len(output_data.stress) == 1
+    assert len(output_data.phoneme_stress) == 3  # H AA T の3音素
     assert output_data.vowel_index[0] == 1  # AAの位置
-    assert output_data.stress[0] == 1  # AAのストレス値
+    assert (
+        output_data.phoneme_stress[output_data.vowel_index[0]] == 2
+    )  # AAのストレス値（1+1=2）
 
 
 def test_vowel_f0_weighted_mean_basic():
@@ -190,7 +192,9 @@ def test_preprocess_with_stress_phonemes():
     output_data = preprocess(input_data, is_eval=True)
     assert len(output_data.vowel_f0_means) == 1
     assert output_data.vowel_index[0] == 1  # AAの位置
-    assert output_data.stress[0] == 1  # ストレス値1
+    assert (
+        output_data.phoneme_stress[output_data.vowel_index[0]] == 2
+    )  # ストレス値（1+1=2）
 
 
 def test_time_mismatch_error():
@@ -236,13 +240,17 @@ def test_preprocess_basic_functionality():
     output_data = preprocess(input_data, is_eval=True)
     assert_output_data_types(output_data)
 
-    # 母音が2つ（AA, AE）なので、ストレスとvowel_indexの長さが2
+    # 母音が2つ（AA, AE）なので、vowel_indexの長さが2、phoneme_stressは全音素の5つ
     assert len(output_data.vowel_index) == 2
-    assert len(output_data.stress) == 2
+    assert len(output_data.phoneme_stress) == 5  # HH AA L AE T の5音素
     assert output_data.vowel_index[0] == 1  # AAの位置
     assert output_data.vowel_index[1] == 3  # AEの位置
-    assert output_data.stress[0] == 1  # AAのストレス値
-    assert output_data.stress[1] == 2  # AEのストレス値
+    assert (
+        output_data.phoneme_stress[output_data.vowel_index[0]] == 2
+    )  # AAのストレス値（1+1=2）
+    assert (
+        output_data.phoneme_stress[output_data.vowel_index[1]] == 3
+    )  # AEのストレス値（2+1=3）
 
 
 def test_no_vowels_case():
@@ -292,7 +300,8 @@ def test_multiple_stress_values_processing():
 
     # preprocess後も保持されているか確認
     output_data = preprocess(input_data, is_eval=True)
-    assert torch.equal(output_data.stress, torch.tensor([0, 2]))
+    # 全音素のストレス値：B=0, AA0=1(0+1), T=0, EH2=3(2+1), S=0 → [0, 1, 0, 3, 0]
+    assert torch.equal(output_data.phoneme_stress, torch.tensor([0, 1, 0, 3, 0]))
     assert torch.equal(output_data.vowel_index, torch.tensor([1, 3]))
 
 

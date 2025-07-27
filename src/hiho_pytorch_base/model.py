@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import torch
 from torch import Tensor, nn
 from torch.nn.functional import binary_cross_entropy_with_logits, mse_loss
 
@@ -35,29 +36,32 @@ class Model(nn.Module):
 
     def forward(self, batch: BatchOutput) -> ModelOutput:
         """データをネットワークに入力して損失などを計算する"""
-        f0_output, vuv_output = self.predictor(
-            lab_phoneme_ids=batch.lab_phoneme_ids,
-            lab_durations=batch.lab_durations,
-            f0_data=batch.f0_data,
-            volume_data=batch.volume_data,
+        f0_output_list, vuv_output_list = self.predictor(
+            phoneme_ids_list=batch.phoneme_ids_list,
+            phoneme_durations_list=batch.phoneme_durations_list,
+            phoneme_stress_list=batch.phoneme_stress_list,
+            vowel_index_list=batch.vowel_index_list,
             speaker_id=batch.speaker_id,
-        )  # (B,), (B,)
+        )  # [(vL,)], [(vL,)]
 
-        # ターゲットとして母音F0の平均を使用
-        target_f0 = batch.vowel_f0_means.mean(dim=1)  # (B, vL) -> (B,)
-        target_vuv = batch.vowel_voiced.any(dim=1)  # (B, vL) -> (B,)
+        # 一括で損失計算
+        pred_f0_all = torch.cat(f0_output_list, dim=0)  # (sum(vL),)
+        pred_vuv_all = torch.cat(vuv_output_list, dim=0)  # (sum(vL),)
+        target_f0_all = torch.cat(batch.vowel_f0_means_list, dim=0)  # (sum(vL),)
+        target_vuv_all = torch.cat(batch.vowel_voiced_list, dim=0)  # (sum(vL),)
 
-        # vuv損失
-        vuv_loss = binary_cross_entropy_with_logits(vuv_output, target_vuv.float())
+        # vuv損失（全母音で計算）
+        vuv_loss = binary_cross_entropy_with_logits(
+            pred_vuv_all, target_vuv_all.float()
+        )
 
-        # F0損失
-        voiced_mask = target_vuv  # (B,)
+        # F0損失（有声母音のみで計算）
+        voiced_mask = target_vuv_all  # (sum(vL),)
         if voiced_mask.any():
-            f0_loss = mse_loss(f0_output[voiced_mask], target_f0[voiced_mask])
+            f0_loss = mse_loss(pred_f0_all[voiced_mask], target_f0_all[voiced_mask])
         else:
-            f0_loss = mse_loss(f0_output, target_f0) * 0.0
+            f0_loss = pred_f0_all.new_tensor(0.0)
 
-        # 全体損失
         loss = f0_loss + vuv_loss
 
         return ModelOutput(

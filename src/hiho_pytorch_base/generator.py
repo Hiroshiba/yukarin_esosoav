@@ -17,8 +17,8 @@ TensorLike = Tensor | numpy.ndarray
 class GeneratorOutput:
     """生成したデータ"""
 
-    f0: Tensor  # (B,)
-    vuv: Tensor  # (B,)
+    f0: list[Tensor]  # [(vL,)]
+    vuv: list[Tensor]  # [(vL,)]
 
 
 def to_tensor(array: TensorLike, device: torch.device) -> Tensor:
@@ -58,10 +58,10 @@ class Generator(nn.Module):
     def forward(
         self,
         *,
-        lab_phoneme_ids: TensorLike,  # (B, L)
-        lab_durations: TensorLike,  # (B, L)
-        f0_data: TensorLike,  # (B, T)
-        volume_data: TensorLike,  # (B, T)
+        phoneme_ids_list: list[Tensor],  # [(L,)]
+        phoneme_durations_list: list[Tensor],  # [(L,)]
+        phoneme_stress_list: list[Tensor],  # [(L,)]
+        vowel_index_list: list[Tensor],  # [(vL,)]
         speaker_id: TensorLike,  # (B,)
     ) -> GeneratorOutput:
         """生成経路で推論する"""
@@ -72,14 +72,17 @@ class Generator(nn.Module):
             return to_tensor(data, self.device)
 
         (
-            f0_output,  # (B,)
-            vuv_output,  # (B,)
+            f0_output_list,  # [(vL,)]
+            vuv_output_list,  # [(vL,)]
         ) = self.predictor(
-            lab_phoneme_ids=_convert(lab_phoneme_ids),
-            lab_durations=_convert(lab_durations),
-            f0_data=_convert(f0_data),
-            volume_data=_convert(volume_data),
+            phoneme_ids_list=phoneme_ids_list,
+            phoneme_durations_list=phoneme_durations_list,
+            phoneme_stress_list=phoneme_stress_list,
+            vowel_index_list=vowel_index_list,
             speaker_id=_convert(speaker_id),
         )
 
-        return GeneratorOutput(f0=f0_output, vuv=vuv_output)
+        return GeneratorOutput(
+            f0=f0_output_list,  # [(vL,)]
+            vuv=vuv_output_list,  # [(vL,)]
+        )

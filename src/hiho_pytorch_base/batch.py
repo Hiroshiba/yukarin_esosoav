@@ -14,47 +14,25 @@ from hiho_pytorch_base.data.data import OutputData
 class BatchOutput:
     """バッチ処理後のデータ構造"""
 
-    lab_phoneme_ids: Tensor  # (B, L)
-    lab_durations: Tensor  # (B, L)
-    f0_data: Tensor  # (B, T)
-    volume_data: Tensor  # (B, T)
-    vowel_f0_means: Tensor  # (B, vL)
-    vowel_voiced: Tensor  # (B, vL)
+    phoneme_ids_list: list[Tensor]  # [(L,)]
+    phoneme_durations_list: list[Tensor]  # [(L,)]
+    phoneme_stress_list: list[Tensor]  # [(L,)]
+    f0_data_list: list[Tensor]  # [(T,)]
+    volume_data_list: list[Tensor]  # [(T,)]
+    vowel_f0_means_list: list[Tensor]  # [(vL,)]
+    vowel_voiced_list: list[Tensor]  # [(vL,)]
+    vowel_index_list: list[Tensor]  # [(vL,)]
     speaker_id: Tensor  # (B,)
 
     @property
     def data_num(self) -> int:
         """バッチサイズを返す"""
-        return self.lab_phoneme_ids.shape[0]
+        return self.speaker_id.shape[0]
 
 
 def collate_stack(values: list[Tensor]) -> Tensor:
-    """Tensorのリストをスタックする（可変長の場合はパディング）"""
-    # TODO: ここはまだ未完成
-    if not values:
-        raise ValueError("Empty tensor list")
-
-    # 全て同じ形状の場合は通常のstack
-    shapes = [v.shape for v in values]
-    if all(s == shapes[0] for s in shapes):
-        return torch.stack(values)
-
-    # 可変長の場合はパディング
-    max_len = max(v.shape[0] for v in values)
-    padded_values = []
-    for v in values:
-        if len(v.shape) == 1:
-            # 1D tensor (音素ID等)
-            pad_size = max_len - v.shape[0]
-            padded = torch.cat([v, torch.zeros(pad_size, dtype=v.dtype)])
-        else:
-            # 多次元tensorの場合は0次元でパディング
-            pad_size = max_len - v.shape[0]
-            pad_shape = (pad_size,) + v.shape[1:]
-            padded = torch.cat([v, torch.zeros(pad_shape, dtype=v.dtype)])
-        padded_values.append(padded)
-
-    return torch.stack(padded_values)
+    """Tensorのリストをスタックする"""
+    return torch.stack(values)
 
 
 def collate_list(values: list[Tensor]) -> list[Tensor]:
@@ -68,11 +46,13 @@ def collate_dataset_output(data_list: list[OutputData]) -> BatchOutput:
         raise ValueError("batch is empty")
 
     return BatchOutput(
-        lab_phoneme_ids=collate_stack([d.phoneme_id for d in data_list]),
-        lab_durations=collate_stack([d.phoneme_duration for d in data_list]),
-        f0_data=collate_stack([d.f0 for d in data_list]),
-        volume_data=collate_stack([d.volume for d in data_list]),
-        vowel_f0_means=collate_stack([d.vowel_f0_means for d in data_list]),
-        vowel_voiced=collate_stack([d.vowel_voiced for d in data_list]),
+        phoneme_ids_list=collate_list([d.phoneme_id for d in data_list]),
+        phoneme_durations_list=collate_list([d.phoneme_duration for d in data_list]),
+        phoneme_stress_list=collate_list([d.phoneme_stress for d in data_list]),
+        f0_data_list=collate_list([d.f0 for d in data_list]),
+        volume_data_list=collate_list([d.volume for d in data_list]),
+        vowel_f0_means_list=collate_list([d.vowel_f0_means for d in data_list]),
+        vowel_voiced_list=collate_list([d.vowel_voiced for d in data_list]),
+        vowel_index_list=collate_list([d.vowel_index for d in data_list]),
         speaker_id=collate_stack([d.speaker_id for d in data_list]),
     )

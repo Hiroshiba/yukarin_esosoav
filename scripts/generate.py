@@ -73,10 +73,10 @@ def generate(
     batch: BatchOutput
     for batch in tqdm(data_loader, desc="generate"):
         _ = generator(
-            lab_phoneme_ids=batch.lab_phoneme_ids,
-            lab_durations=batch.lab_durations,
-            f0_data=batch.f0_data,
-            volume_data=batch.volume_data,
+            phoneme_ids_list=batch.phoneme_ids_list,
+            phoneme_durations_list=batch.phoneme_durations_list,
+            phoneme_stress_list=batch.phoneme_stress_list,
+            vowel_index_list=batch.vowel_index_list,
             speaker_id=batch.speaker_id,
         )
 

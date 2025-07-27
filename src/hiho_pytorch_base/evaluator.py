@@ -36,26 +36,26 @@ class Evaluator(nn.Module):
         """データをネットワークに入力して評価値を計算する"""
         # TODO: 適当な実装なので変更する
 
-        # ターゲットとして母音F0の平均を使用
-        target_f0 = batch.vowel_f0_means.mean(dim=1)  # (B, vL) -> (B,)
-        target_vuv = batch.vowel_voiced.any(dim=1)  # (B, vL) -> (B,)
-
         output_result: GeneratorOutput = self.generator(
-            lab_phoneme_ids=batch.lab_phoneme_ids,
-            lab_durations=batch.lab_durations,
-            f0_data=batch.f0_data,
-            volume_data=batch.volume_data,
+            phoneme_ids_list=batch.phoneme_ids_list,
+            phoneme_durations_list=batch.phoneme_durations_list,
+            phoneme_stress_list=batch.phoneme_stress_list,
+            vowel_index_list=batch.vowel_index_list,
             speaker_id=batch.speaker_id,
         )
-        predicted_f0 = output_result.f0  # (B,)
-        predicted_vuv = output_result.vuv  # (B,)
+
+        # 予測結果とターゲットを結合して一括計算
+        predicted_f0_all = torch.cat(output_result.f0, dim=0)  # (sum(vL),)
+        predicted_vuv_all = torch.cat(output_result.vuv, dim=0)  # (sum(vL),)
+        target_f0_all = torch.cat(batch.vowel_f0_means_list, dim=0)  # (sum(vL),)
+        target_vuv_all = torch.cat(batch.vowel_voiced_list, dim=0)  # (sum(vL),)
 
         # MSE損失を計算
-        loss = mse_loss(predicted_f0, target_f0)
+        loss = mse_loss(predicted_f0_all, target_f0_all)
 
         # 有声かどうかの精度
-        predicted_vuv_binary = predicted_vuv > 0.0
-        vuv_accuracy = (predicted_vuv_binary == target_vuv).float().mean()
+        predicted_vuv_binary = predicted_vuv_all > 0.0
+        vuv_accuracy = (predicted_vuv_binary == target_vuv_all).float().mean()
 
         return EvaluatorOutput(
             loss=loss,

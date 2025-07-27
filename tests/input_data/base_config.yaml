@@ -22,6 +22,8 @@ network:
   conformer_dropout_rate: 0.1
   speaker_size: 3
   speaker_embedding_size: 8
+  stress_embedding_size: 4
+  input_phoneme_duration: true
 
 model: {}
 

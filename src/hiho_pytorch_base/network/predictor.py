@@ -12,22 +12,24 @@ from hiho_pytorch_base.network.transformer.utility import make_non_pad_mask
 class Predictor(nn.Module):
     """メインのネットワーク"""
 
-    # TODO: ちゃんとしたネットワーク設計にする
-
     def __init__(
         self,
         phoneme_size: int,
         hidden_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
+        stress_embedding_size: int,
+        input_phoneme_duration: bool,
         encoder: Encoder,
     ):
         super().__init__()
 
-        self.phoneme_size = phoneme_size
         self.hidden_size = hidden_size
 
         self.phoneme_embedder = nn.Embedding(phoneme_size, hidden_size)
+        self.stress_embedder = nn.Embedding(
+            4, stress_embedding_size
+        )  # 子音=0, 母音=1-3
 
         # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
         self.phoneme_transform = nn.Sequential(
@@ -39,56 +41,92 @@ class Predictor(nn.Module):
 
         self.speaker_embedder = nn.Embedding(speaker_size, speaker_embedding_size)
 
-        # 適当な線形層の組み合わせ
-        input_size = (
-            hidden_size + speaker_embedding_size + 2
-        )  # 音素埋め込み + 話者埋め込み + F0平均 + Volume平均
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size // 2)
+        # 継続時間写像（オプション）
+        self.duration_linear = (
+            nn.Linear(1, hidden_size) if input_phoneme_duration else None
+        )
+
+        # Conformer前の写像
+        embedding_size = hidden_size + stress_embedding_size
+        if input_phoneme_duration:
+            embedding_size += hidden_size
+        self.pre_conformer = nn.Linear(
+            embedding_size + speaker_embedding_size, hidden_size
+        )
+
+        self.encoder = encoder
 
         # 出力ヘッド
-        self.f0_head = nn.Linear(hidden_size // 2, 1)  # F0予測用
-        self.vuv_head = nn.Linear(hidden_size // 2, 1)  # VUV予測用
-
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.1)
+        self.f0_head = nn.Linear(hidden_size, 1)  # F0予測用
+        self.vuv_head = nn.Linear(hidden_size, 1)  # vuv予測用
 
     def forward(  # noqa: D102
         self,
         *,
-        lab_phoneme_ids: Tensor,  # (B, L)
-        lab_durations: Tensor,  # (B, L)
-        f0_data: Tensor,  # (B, T)
-        volume_data: Tensor,  # (B, T)
+        phoneme_ids_list: list[Tensor],  # [(L,)]
+        phoneme_durations_list: list[Tensor],  # [(L,)]
+        phoneme_stress_list: list[Tensor],  # [(L,)]
+        vowel_index_list: list[Tensor],  # [(vL,)]
         speaker_id: Tensor,  # (B,)
-    ) -> tuple[Tensor, Tensor]:  # (B,), (B,)
-        # 音素埋め込みの平均を計算（超雑）
-        phoneme_embed = self.phoneme_embedder(lab_phoneme_ids)  # (B, L, ?)
+    ) -> tuple[list[Tensor], list[Tensor]]:  # f0_list [(vL,)], vuv_list [(vL,)]
+        device = speaker_id.device
+        batch_size = len(phoneme_ids_list)
+
+        # シーケンスをパディング
+        phoneme_lengths = torch.tensor(
+            [seq.shape[0] for seq in phoneme_ids_list], device=device
+        )
+        padded_phoneme_ids = pad_sequence(phoneme_ids_list, batch_first=True)  # (B, L)
+        padded_durations = pad_sequence(
+            phoneme_durations_list, batch_first=True
+        )  # (B, L)
+        padded_phoneme_stress = pad_sequence(
+            phoneme_stress_list, batch_first=True
+        )  # (B, L)
+
+        # 埋め込み
+        phoneme_embed = self.phoneme_embedder(padded_phoneme_ids)  # (B, L, ?)
         phoneme_embed = self.phoneme_transform(phoneme_embed)  # (B, L, ?)
-        phoneme_mean = torch.mean(phoneme_embed, dim=1)  # (B, ?)
+        stress_embed = self.stress_embedder(padded_phoneme_stress)  # (B, L, ?)
 
         # 話者埋め込み
         speaker_embed = self.speaker_embedder(speaker_id)  # (B, ?)
+        max_length = padded_phoneme_ids.size(1)
+        speaker_embed = speaker_embed.unsqueeze(1).expand(
+            batch_size, max_length, -1
+        )  # (B, L, ?)
 
-        # F0とVolumeの平均を計算（超雑）
-        f0_mean = torch.mean(f0_data, dim=1).squeeze(-1).unsqueeze(-1)  # (B, 1)
-        volume_mean = torch.mean(volume_data, dim=1).squeeze(-1).unsqueeze(-1)  # (B, 1)
+        # 埋め込みを結合
+        h = torch.cat([phoneme_embed, stress_embed], dim=2)  # (B, L, ?)
 
-        # 全部をconcatenate
-        features = torch.cat(
-            [phoneme_mean, speaker_embed, f0_mean, volume_mean], dim=1
-        )  # (B, ?)
+        # 継続時間入力（オプション）
+        if self.duration_linear is not None:
+            duration_embed = self.duration_linear(
+                padded_durations.unsqueeze(-1)
+            )  # (B, L, ?)
+            h = torch.cat([h, duration_embed], dim=2)
 
-        # 適当な線形層を通す
-        h = self.relu(self.fc1(features))
-        h = self.dropout(h)
-        h = self.relu(self.fc2(h))
-        h = self.dropout(h)
+        # 話者情報を追加
+        h = torch.cat([h, speaker_embed], dim=2)  # (B, L, ?)
 
-        f0_output = self.f0_head(h).squeeze(-1)  # (B,)
-        vuv_output = self.vuv_head(h).squeeze(-1)  # (B,)
+        # Conformer前の投影
+        h = self.pre_conformer(h)  # (B, L, ?)
 
-        return f0_output, vuv_output
+        # マスキング
+        mask = make_non_pad_mask(phoneme_lengths).unsqueeze(-2).to(device)  # (B, 1, L)
+
+        # Conformerエンコーダ
+        h, _ = self.encoder(x=h, cond=None, mask=mask)  # (B, L, ?)
+
+        # 出力ヘッド - 全音素に対して予測
+        f0 = self.f0_head(h).squeeze(-1)  # (B, L)
+        vuv = self.vuv_head(h).squeeze(-1)  # (B, L)
+
+        # 母音位置でフィルタ
+        return (
+            [f0[i, vowel_indices] for i, vowel_indices in enumerate(vowel_index_list)],
+            [vuv[i, vowel_indices] for i, vowel_indices in enumerate(vowel_index_list)],
+        )
 
 
 def create_predictor(config: NetworkConfig) -> Predictor:
@@ -112,5 +150,7 @@ def create_predictor(config: NetworkConfig) -> Predictor:
         hidden_size=config.hidden_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
+        stress_embedding_size=config.stress_embedding_size,
+        input_phoneme_duration=config.input_phoneme_duration,
         encoder=encoder,
     )
