@@ -49,9 +49,13 @@ class Predictor(nn.Module):
             [var_data.shape[0] for var_data in feature_variable_list], device=device
         )
 
-        padded_variable = pad_sequence(
-            feature_variable_list, batch_first=True
-        )  # (B, L, ?)
+        if batch_size == 1:
+            # NOTE: ONNX化の際にpad_sequenceがエラーになるため迂回
+            padded_variable = feature_variable_list[0].unsqueeze(0)  # (1, L, ?)
+        else:
+            padded_variable = pad_sequence(
+                feature_variable_list, batch_first=True
+            )  # (B, L, ?)
 
         speaker_embedding = self.speaker_embedder(speaker_id)  # (B, ?)
 
