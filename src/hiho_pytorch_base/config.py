@@ -33,11 +33,8 @@ class NetworkConfig(BaseModel):
 
     phoneme_size: int
     hidden_size: int
-    conformer_layers: int
-    conformer_heads: int
-    conformer_ff_dim: int
-    conformer_kernel_size: int
-    conformer_dropout: float
+    conformer_block_num: int
+    conformer_dropout_rate: float
     speaker_size: int
     speaker_embedding_size: int
 

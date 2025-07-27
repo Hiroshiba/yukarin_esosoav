@@ -18,11 +18,8 @@ dataset:
 network:
   phoneme_size: 49
   hidden_size: 32
-  conformer_layers: 1
-  conformer_heads: 2
-  conformer_ff_dim: 32
-  conformer_kernel_size: 3
-  conformer_dropout: 0.0
+  conformer_block_num: 4
+  conformer_dropout_rate: 0.1
   speaker_size: 3
   speaker_embedding_size: 8
 

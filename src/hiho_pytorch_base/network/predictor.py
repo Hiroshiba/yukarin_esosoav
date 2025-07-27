@@ -2,8 +2,11 @@
 
 import torch
 from torch import Tensor, nn
+from torch.nn.utils.rnn import pad_sequence
 
 from hiho_pytorch_base.config import NetworkConfig
+from hiho_pytorch_base.network.conformer.encoder import Encoder
+from hiho_pytorch_base.network.transformer.utility import make_non_pad_mask
 
 
 class Predictor(nn.Module):
@@ -17,6 +20,7 @@ class Predictor(nn.Module):
         hidden_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
+        encoder: Encoder,
     ):
         super().__init__()
 
@@ -89,9 +93,24 @@ class Predictor(nn.Module):
 
 def create_predictor(config: NetworkConfig) -> Predictor:
     """設定からPredictorを作成"""
+    encoder = Encoder(
+        hidden_size=config.hidden_size,
+        condition_size=0,
+        block_num=config.conformer_block_num,
+        dropout_rate=config.conformer_dropout_rate,
+        positional_dropout_rate=config.conformer_dropout_rate,
+        attention_head_size=8,
+        attention_dropout_rate=config.conformer_dropout_rate,
+        use_macaron_style=True,
+        use_conv_glu_module=True,
+        conv_glu_module_kernel_size=31,
+        feed_forward_hidden_size=config.hidden_size * 4,
+        feed_forward_kernel_size=3,
+    )
     return Predictor(
         phoneme_size=config.phoneme_size,
         hidden_size=config.hidden_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
+        encoder=encoder,
     )

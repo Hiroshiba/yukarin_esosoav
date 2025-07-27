@@ -71,12 +71,15 @@ class Generator(nn.Module):
         ) -> Tensor:
             return to_tensor(data, self.device)
 
-        f0_output, vuv_output = self.predictor(
+        (
+            f0_output,  # (B,)
+            vuv_output,  # (B,)
+        ) = self.predictor(
             lab_phoneme_ids=_convert(lab_phoneme_ids),
             lab_durations=_convert(lab_durations),
             f0_data=_convert(f0_data),
             volume_data=_convert(volume_data),
             speaker_id=_convert(speaker_id),
-        )  # (B,), (B,)
+        )
 
         return GeneratorOutput(f0=f0_output, vuv=vuv_output)
