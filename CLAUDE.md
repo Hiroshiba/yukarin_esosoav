@@ -60,6 +60,11 @@ uv run -m scripts.train <config_yaml_path> <output_dir>
 uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
 ```
 
+### データセットチェック
+```bash
+uv run -m scripts.check_dataset <config_yaml_path> [--trials 10]
+```
+
 ### テスト実行
 ```bash
 uv run pytest tests/ -sv
