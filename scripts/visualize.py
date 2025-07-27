@@ -9,6 +9,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import gradio as gr
 import japanize_matplotlib  # noqa: F401 日本語フォントに必須
@@ -20,7 +21,13 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.dataset import DatasetType, create_dataset
+from hiho_pytorch_base.data.data import OutputData
+from hiho_pytorch_base.dataset import (
+    DatasetCollection,
+    DatasetType,
+    LazyInputData,
+    create_dataset,
+)
 
 
 @dataclass
@@ -53,23 +60,25 @@ class VisualizationApp:
         self.dataset_collection = self._create_dataset()
         self.figure_state = FigureState()
 
-    def _create_dataset(self):
+    def _create_dataset(self) -> DatasetCollection:
         """データセットを作成"""
         with self.config_path.open() as f:
             config = Config.from_dict(yaml.safe_load(f))
         return create_dataset(config.dataset)
 
-    def _get_output_data(self, index: int, dataset_type: DatasetType):
+    def _get_output_data(self, index: int, dataset_type: DatasetType) -> OutputData:
         """前処理済みのOutputDataを取得"""
         dataset = self.dataset_collection.get(dataset_type)
         return dataset[index]
 
-    def _get_lazy_data(self, index: int, dataset_type: DatasetType):
+    def _get_lazy_data(self, index: int, dataset_type: DatasetType) -> LazyInputData:
         """遅延読み込み用のLazyInputDataを取得"""
         dataset = self.dataset_collection.get(dataset_type)
         return dataset.datas[index]
 
-    def _create_details_text(self, output_data, lazy_data):
+    def _create_details_text(
+        self, output_data: OutputData, lazy_data: LazyInputData
+    ) -> str:
         """詳細情報テキストを作成"""
         return f"""
 設定ファイル: {self.config_path}
@@ -93,7 +102,7 @@ shape: {tuple(output_data.target_scalar.shape)}
 話者ID: {output_data.speaker_id.item()}
 """
 
-    def _setup_feature_vector_plot(self, data):
+    def _setup_feature_vector_plot(self, data: np.ndarray) -> Figure:
         if (
             self.figure_state.feature_vector_fig is None
             or self.figure_state.feature_vector_line is None
@@ -115,7 +124,7 @@ shape: {tuple(output_data.target_scalar.shape)}
 
         return self.figure_state.feature_vector_fig
 
-    def _setup_feature_variable_plot(self, data):
+    def _setup_feature_variable_plot(self, data: np.ndarray) -> Figure:
         if (
             self.figure_state.feature_variable_fig is None
             or self.figure_state.feature_variable_line is None
@@ -137,7 +146,9 @@ shape: {tuple(output_data.target_scalar.shape)}
 
         return self.figure_state.feature_variable_fig
 
-    def _setup_plots(self, index: int, dataset_type: DatasetType):
+    def _setup_plots(
+        self, index: int, dataset_type: DatasetType
+    ) -> tuple[Figure, Figure]:
         """プロットを作成または更新"""
         output_data = self._get_output_data(index, dataset_type)
 
@@ -168,7 +179,7 @@ shape: {tuple(output_data.target_scalar.shape)}
             details=details,
         )
 
-    def launch(self):
+    def launch(self) -> None:
         """Gradio UIを起動"""
         initial_dataset = self.dataset_collection.get(self.initial_dataset_type)
         initial_max_index = len(initial_dataset) - 1
@@ -196,7 +207,7 @@ shape: {tuple(output_data.target_scalar.shape)}
                 )
 
             @gr.render(inputs=[current_index, current_dataset_type])
-            def render_content(index: int, dataset_type: DatasetType):
+            def render_content(index: int, dataset_type: DatasetType) -> None:
                 # プロットとデータ情報を取得
                 feature_vector_plot, feature_variable_plot = self._setup_plots(
                     index, dataset_type
@@ -243,7 +254,9 @@ shape: {tuple(output_data.target_scalar.shape)}
                 )
 
             # 状態変更によるUI同期
-            def sync_slider_from_state(index: int, dataset_type: DatasetType):
+            def sync_slider_from_state(
+                index: int, dataset_type: DatasetType
+            ) -> tuple[int, Any]:
                 dataset = self.dataset_collection.get(dataset_type)
                 max_index = len(dataset) - 1
 
@@ -286,7 +299,7 @@ shape: {tuple(output_data.target_scalar.shape)}
         demo.launch()
 
 
-def visualize(config_path: Path, dataset_type: DatasetType):
+def visualize(config_path: Path, dataset_type: DatasetType) -> None:
     """指定されたデータセットをGradio UIで可視化する"""
     app = VisualizationApp(config_path, dataset_type)
     app.launch()
