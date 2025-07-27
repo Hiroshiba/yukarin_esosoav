@@ -21,8 +21,15 @@ import yaml
 from matplotlib.figure import Figure
 
 from hiho_pytorch_base.config import Config
+from hiho_pytorch_base.data.data import OutputData
 from hiho_pytorch_base.data.phoneme import ArpaPhoneme
-from hiho_pytorch_base.dataset import DatasetType, create_dataset
+from hiho_pytorch_base.dataset import (
+    Dataset,
+    DatasetCollection,
+    DatasetType,
+    LazyInputData,
+    create_dataset,
+)
 
 
 @dataclass
@@ -42,7 +49,7 @@ class FigureState:
     main_plot_fig: Figure | None = None
 
 
-def get_audio_path_from_lab(lab_file_path: Path) -> Path | None:
+def get_audio_path_from_lab(lab_file_path: Path) -> Path:
     """.labファイルのパスから対応する音声ファイルのパスを取得"""
     stem = lab_file_path.stem
 
@@ -107,13 +114,15 @@ class VisualizationApp:
         self.dataset_collection = self._load_dataset()
         self.figure_state = FigureState()
 
-    def _load_dataset(self):
+    def _load_dataset(self) -> DatasetCollection:
         """データセットを読み込み"""
         with self.config_path.open() as f:
             config = Config.from_dict(yaml.safe_load(f))
         return create_dataset(config.dataset)
 
-    def _get_dataset_and_data(self, index: int, dataset_type: DatasetType):
+    def _get_dataset_and_data(
+        self, index: int, dataset_type: DatasetType
+    ) -> tuple[Dataset, OutputData, LazyInputData]:
         """データセットとデータを取得する共通処理"""
         dataset = self.dataset_collection.get(dataset_type)
         output_data = dataset[index]
@@ -127,7 +136,7 @@ class VisualizationApp:
 
         try:
             audio_path = get_audio_path_from_lab(lazy_data.lab_path)
-            audio_path_str = str(audio_path.name) if audio_path else "見つからない"
+            audio_path_str = str(audio_path)
         except (FileNotFoundError, ValueError):
             audio_path_str = "見つからない"
 
@@ -139,25 +148,38 @@ LABデータパス: {lazy_data.lab_path}
 話者ID: {lazy_data.speaker_id}
 音声ファイル: {audio_path_str}"""
 
-    def _create_data_processing_text(self, output_data, phonemes, f0_rate):
+    def _create_data_processing_text(
+        self, output_data: OutputData, phonemes: list[ArpaPhoneme], f0_rate: float
+    ) -> str:
         """データ処理結果の情報テキストを作成"""
+        vowel_voiced_count = output_data.vowel_voiced.sum().item()
+        total_vowels = len(output_data.vowel_voiced)
         return f"""F0データ shape: {tuple(output_data.f0.shape)}
 Volumeデータ shape: {tuple(output_data.volume.shape)}
 母音F0重心 shape: {tuple(output_data.vowel_f0_means.shape)}
+音素ストレス shape: {tuple(output_data.phoneme_stress.shape)}
+母音有声情報 shape: {tuple(output_data.vowel_voiced.shape)}
 
 音素数: {len(phonemes)}
+母音数: {total_vowels}
+有声母音数: {vowel_voiced_count}
 話者ID: {output_data.speaker_id.item()}
 サンプリングレート: {f0_rate:.2f} Hz"""
 
     def _create_integrated_f0_plot(
-        self, output_data, phonemes, f0_rate: float, time_start: float, time_end: float
-    ):
+        self,
+        output_data: OutputData,
+        phonemes: list[ArpaPhoneme],
+        f0_rate: float,
+        time_start: float,
+        time_end: float,
+    ) -> Figure:
         """統合F0プロットを作成"""
         f0_values = output_data.f0.detach().numpy()
         volume_values = output_data.volume.detach().numpy()
         vowel_f0_means = output_data.vowel_f0_means.detach().numpy()
-        stress_values = output_data.stress.detach().numpy()
-        vowel_indices = output_data.vowel_index.detach().numpy()
+        stress_values = output_data.phoneme_stress.detach().numpy()
+        vowel_voiced = output_data.vowel_voiced.detach().numpy()
 
         self.figure_state.main_plot_fig, ax1 = plt.subplots(1, 1, figsize=(24, 6))
 
@@ -191,11 +213,6 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
         cmap = plt.cm.tab20  # type: ignore
         max_phoneme_id = len(ArpaPhoneme.phoneme_list)
 
-        vowel_stress_map = {}
-        for i, vowel_idx in enumerate(vowel_indices):
-            if i < len(stress_values):
-                vowel_stress_map[vowel_idx] = stress_values[i]
-
         for phoneme_idx, phoneme in enumerate(phonemes):
             if phoneme.end >= time_start and phoneme.start <= time_end:
                 color = cmap(phoneme.phoneme_id / max_phoneme_id)
@@ -213,11 +230,8 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
                         bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.8),
                     )
 
-                    if (
-                        ArpaPhoneme.is_vowel(phoneme.phoneme)
-                        and phoneme_idx in vowel_stress_map
-                    ):
-                        stress_value = vowel_stress_map[phoneme_idx]
+                    if ArpaPhoneme.is_vowel(phoneme.phoneme):
+                        stress_value = stress_values[phoneme_idx] - 1  # 1,2,3 -> 0,1,2
                         if stress_value > 0:
                             stress_display = "*" * stress_value
                             ax1.text(
@@ -232,36 +246,49 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
                             )
 
         vowel_idx = 0
-        plotted_vowels = 0
         for phoneme in phonemes:
             if ArpaPhoneme.is_vowel(phoneme.phoneme):
                 if phoneme.end >= time_start and phoneme.start <= time_end:
                     mid_time = (phoneme.start + phoneme.end) / 2
-                    if (
-                        vowel_idx < len(vowel_f0_means)
-                        and vowel_f0_means[vowel_idx] > 0
-                    ):
+                    if vowel_idx < len(vowel_f0_means):
+                        is_voiced = vowel_voiced[vowel_idx]
+                        f0_value = vowel_f0_means[vowel_idx]
+
+                        if is_voiced:
+                            color = "red"
+                            marker = "o"
+                            bbox_color = "yellow"
+                            annotation_text = f"{f0_value:.1f}Hz"
+                            display_y = f0_value
+                        else:
+                            color = "gray"
+                            marker = "s"
+                            bbox_color = "lightgray"
+                            annotation_text = "無声"
+                            display_y = 50
+
                         ax1.scatter(
                             mid_time,
-                            vowel_f0_means[vowel_idx],
+                            display_y,
                             s=200,
-                            c="red",
-                            marker="o",
+                            c=color,
+                            marker=marker,
                             edgecolors="black",
                             linewidth=2,
                             zorder=10,
-                            label="Vowel F0 Centroid" if plotted_vowels == 0 else "",
+                            label="Vowel F0" if vowel_idx == 0 else "",
                         )
+
                         ax1.annotate(
-                            f"{vowel_f0_means[vowel_idx]:.1f}Hz",
-                            xy=(float(mid_time), float(vowel_f0_means[vowel_idx])),
+                            annotation_text,
+                            xy=(float(mid_time), float(display_y)),
                             xytext=(5, 10),
                             textcoords="offset points",
                             fontsize=14,
                             fontweight="bold",
                             bbox=dict(
                                 boxstyle="round,pad=0.3",
-                                facecolor="yellow",
+                                facecolor=bbox_color,
                                 alpha=0.8,
                             ),
                             arrowprops=dict(
@@ -269,7 +296,6 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
                                 connectionstyle="arc3,rad=0",
                             ),
                         )
-                        plotted_vowels += 1
                 vowel_idx += 1
 
         lines1, labels1 = ax1.get_legend_handles_labels()
@@ -295,7 +321,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
         dataset_type: DatasetType,
         time_start: float = 0,
         time_end: float = 2,
-    ):
+    ) -> Figure:
         """プロットを作成"""
         dataset, output_data, lazy_data = self._get_dataset_and_data(
             index, dataset_type
@@ -333,7 +359,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
         try:
             audio_path = get_audio_path_from_lab(lazy_data.lab_path)
             if audio_path:
-                audio_path_str = str(audio_path.name)
+                audio_path_str = str(audio_path)
             else:
                 audio_path_str = "見つからない"
         except (FileNotFoundError, ValueError):
@@ -354,7 +380,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
             details=details,
         )
 
-    def launch(self):
+    def launch(self) -> None:
         """Gradio UIを起動"""
         initial_dataset = self.dataset_collection.get(self.initial_dataset_type)
         initial_max_index = len(initial_dataset) - 1
@@ -554,7 +580,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
         demo.launch(share=False, server_name="0.0.0.0", server_port=7860)
 
 
-def visualize(config_path: Path, dataset_type: DatasetType):
+def visualize(config_path: Path, dataset_type: DatasetType) -> None:
     """指定されたデータセットをGradio UIで可視化する"""
     app = VisualizationApp(config_path, dataset_type)
     app.launch()
