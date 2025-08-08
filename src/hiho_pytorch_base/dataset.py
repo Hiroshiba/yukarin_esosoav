@@ -89,7 +89,7 @@ class DatasetCollection:
     test: Dataset
     """trainと同じドメインでモデルの過適合確認に用いる"""
 
-    eval: Dataset
+    eval: Dataset | None
     """testと同じデータを評価に用いる"""
 
     valid: Dataset | None
@@ -103,6 +103,8 @@ class DatasetCollection:
             case DatasetType.TEST:
                 return self.test
             case DatasetType.EVAL:
+                if self.eval is None:
+                    raise ValueError("evalデータセットが設定されていません")
                 return self.eval
             case DatasetType.VALID:
                 if self.valid is None:
@@ -217,7 +219,7 @@ def create_dataset(config: DatasetConfig) -> DatasetCollection:
     return DatasetCollection(
         train=_wrapper(trains, is_eval=False),
         test=_wrapper(tests, is_eval=False),
-        eval=_wrapper(tests, is_eval=True),
+        eval=(_wrapper(tests, is_eval=True) if config.eval_for_test else None),
         valid=(
             _wrapper(get_datas(config.valid), is_eval=True)
             if config.valid is not None

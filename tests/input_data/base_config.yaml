@@ -16,6 +16,7 @@ dataset:
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   test_num: 16
+  eval_for_test: true
   eval_times_num: 1
   seed: 42
   frame_rate: 10.0
