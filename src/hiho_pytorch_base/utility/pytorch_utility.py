@@ -131,7 +131,7 @@ def detach_cpu(data: Any) -> Any:
         return data
 
 
-def to_device(batch: Any, device: str, non_blocking: bool = False) -> Any:
+def to_device(batch: Any, device: str, non_blocking: bool) -> Any:
     """データを指定されたデバイスに移動、再帰的に処理"""
     if isinstance(batch, dict):
         return {

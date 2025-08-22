@@ -39,7 +39,8 @@ def check_dataset(config_yaml_path: Path, trials: int) -> None:
         print(f"try {i}")
         wrapper(datasets.train, desc="train", drop_last=True)
         wrapper(datasets.test, desc="test", drop_last=False)
-        wrapper(datasets.eval, desc="eval", drop_last=False)
+        if datasets.eval is not None:
+            wrapper(datasets.eval, desc="eval", drop_last=False)
         if datasets.valid is not None:
             wrapper(datasets.valid, desc="valid", drop_last=False)
 
