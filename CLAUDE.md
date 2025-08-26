@@ -74,6 +74,11 @@ uv run -m scripts.train <config_yaml_path> <output_dir>
 uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
 ```
 
+### データセットチェック
+```bash
+uv run -m scripts.check_dataset <config_yaml_path> [--trials 10]
+```
+
 ### テスト実行
 ```bash
 uv run pytest tests/ -sv
@@ -124,18 +129,6 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 - **最新依存関係**: 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）に準拠し、最新のCUDA/PyTorchベースイメージを使用
 - **音声処理対応**: libsoundfile1-dev、libasound2-dev等の音声処理ライブラリの整備方法をコメント等で案内
 - **uv使用**: pyproject.tomlベースの依存関係管理にuvを使用し、高速なパッケージインストールを実現
-
-## フォーク時の拡張例
-
-このフレームワークを拡張する際の参考：
-
-1. **新しいネットワークアーキテクチャ**: `network/`ディレクトリに追加
-2. **カスタム損失関数**: `model.py`の拡張
-3. **異なるデータ形式**: データローダーの拡張
-
-### 参考プロジェクト
-- 以下のプロジェクトの実装パターンを参考にしている
-- `../yukarin_sosoa`、`../yukarin_sosfd`、`../accent_estimator`
 
 ---
 

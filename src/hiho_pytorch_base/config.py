@@ -24,6 +24,7 @@ class DatasetConfig(BaseModel):
     train: DataFileConfig
     valid: DataFileConfig | None = None
     test_num: int
+    eval_for_test: bool
     eval_times_num: int = 1
     seed: int = 0
 

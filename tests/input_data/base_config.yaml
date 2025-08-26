@@ -12,6 +12,7 @@ dataset:
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   test_num: 16
+  eval_for_test: true
   eval_times_num: 1
   seed: 42
 
@@ -36,9 +37,9 @@ train:
   stop_epoch: 10
   model_save_num: 2
   optimizer:
-    name: "adam"
-    lr: 0.001
-  scheduler: { "name": "warmup", "warmup_steps": 10 }
+    name: "RAdamScheduleFree"
+    lr: 0.003
+  scheduler: null
   num_processes: 0
   use_gpu: false
   use_amp: false
