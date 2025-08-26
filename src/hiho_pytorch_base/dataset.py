@@ -58,11 +58,15 @@ class Dataset(BaseDataset[OutputData]):
 
     def __getitem__(self, i: int) -> OutputData:
         """指定されたインデックスのデータを前処理して返す"""
-        data = self.datas[i]
-        if isinstance(data, LazyInputData):
-            data = data.generate()
-
-        return preprocess(data, is_eval=self.is_eval)
+        try:
+            return preprocess(
+                self.datas[i].generate(),
+                is_eval=self.is_eval,
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"データ処理に失敗しました: index={i} data={self.datas[i]}"
+            ) from e
 
 
 class DatasetType(str, Enum):

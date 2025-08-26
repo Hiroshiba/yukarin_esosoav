@@ -15,7 +15,7 @@ from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import Dataset, create_dataset
 
 
-def check_dataset(config_yaml_path: Path, trials: int) -> None:
+def check_dataset(config_yaml_path: Path, trials: int, break_on_error: bool) -> None:
     """データセットの整合性をチェックする"""
     with config_yaml_path.open() as f:
         config_dict = yaml.safe_load(f)
@@ -33,6 +33,7 @@ def check_dataset(config_yaml_path: Path, trials: int) -> None:
         num_processes=num_processes,
         batch_size=batch_size,
         pin_memory=pin_memory,
+        break_on_error=break_on_error,
     )
 
     for i in range(trials):
@@ -52,6 +53,7 @@ def _check(
     batch_size: int,
     pin_memory: bool,
     drop_last: bool,
+    break_on_error: bool,
 ) -> None:
     wrapper = partial(_wrapper, dataset=dataset)
 
@@ -62,7 +64,8 @@ def _check(
             if error is not None:
                 print(f"error at {i}")
                 traceback.print_exception(type(error), error, error.__traceback__)
-                breakpoint()
+                if break_on_error:
+                    breakpoint()
                 raise error
 
     it = DataLoader(
@@ -90,5 +93,6 @@ def _wrapper(index: int, dataset: Dataset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("config_yaml_path", type=Path)
-    parser.add_argument("--trials", type=int, default=10)
+    parser.add_argument("--trials", type=int, default=3)
+    parser.add_argument("--break_on_error", action="store_true")
     check_dataset(**vars(parser.parse_args()))
