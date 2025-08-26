@@ -9,10 +9,10 @@ RUN apt-get update --fix-missing && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# # 音声を扱う場合
-# RUN apt-get update && \
-#     apt-get install -y swig libsndfile1-dev libasound2-dev && \
-#     apt-get clean
+# 音声を扱う場合
+RUN apt-get update && \
+    apt-get install -y swig libsndfile1-dev libasound2-dev && \
+    apt-get clean
 
 WORKDIR /app
 
