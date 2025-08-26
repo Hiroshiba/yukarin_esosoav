@@ -43,9 +43,9 @@ train:
   stop_epoch: 10
   model_save_num: 2
   optimizer:
-    name: "adam"
-    lr: 0.001
-  scheduler: { "name": "warmup", "warmup_steps": 10 }
+    name: "RAdamScheduleFree"
+    lr: 0.003
+  scheduler: null
   num_processes: 0
   use_gpu: false
   use_amp: false

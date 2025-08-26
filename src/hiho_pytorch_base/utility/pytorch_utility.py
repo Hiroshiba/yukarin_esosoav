@@ -48,6 +48,8 @@ def init_weights(model: torch.nn.Module, name: str) -> None:
 
 def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
     """設定からオプティマイザーを作成"""
+    from schedulefree import RAdamScheduleFree
+
     cp: dict[str, Any] = deepcopy(config_dict)
     n = cp.pop("name").lower()
 
@@ -65,6 +67,8 @@ def make_optimizer(config_dict: dict[str, Any], model: nn.Module) -> Optimizer:
     elif n == "true_adamw":
         cp["weight_decay"] /= cp["lr"]
         optimizer = optim.AdamW(model.parameters(), **cp)
+    elif n == "radamschedulefree":
+        optimizer = RAdamScheduleFree(model.parameters(), **cp)
     else:
         raise ValueError(n)
 
