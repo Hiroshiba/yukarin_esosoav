@@ -18,6 +18,7 @@ dataset:
 
 network:
   phoneme_size: 49
+  phoneme_embedding_size: 24
   hidden_size: 32
   conformer_block_num: 4
   conformer_dropout_rate: 0.1

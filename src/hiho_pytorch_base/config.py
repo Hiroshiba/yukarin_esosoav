@@ -33,6 +33,7 @@ class NetworkConfig(BaseModel):
     """ニューラルネットワークの設定"""
 
     phoneme_size: int
+    phoneme_embedding_size: int
     hidden_size: int
     conformer_block_num: int
     conformer_dropout_rate: float

@@ -15,6 +15,7 @@ class Predictor(nn.Module):
     def __init__(
         self,
         phoneme_size: int,
+        phoneme_embedding_size: int,
         hidden_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
@@ -28,11 +29,11 @@ class Predictor(nn.Module):
 
         # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
         self.phoneme_embedder = nn.Sequential(
-            nn.Embedding(phoneme_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Embedding(phoneme_size, phoneme_embedding_size),
+            nn.Linear(phoneme_embedding_size, phoneme_embedding_size),
+            nn.Linear(phoneme_embedding_size, phoneme_embedding_size),
+            nn.Linear(phoneme_embedding_size, phoneme_embedding_size),
+            nn.Linear(phoneme_embedding_size, phoneme_embedding_size),
         )
         self.stress_embedder = nn.Embedding(
             4, stress_embedding_size
@@ -53,7 +54,7 @@ class Predictor(nn.Module):
         )
 
         # Conformer前の写像
-        embedding_size = hidden_size + stress_embedding_size
+        embedding_size = phoneme_embedding_size + stress_embedding_size
         if input_phoneme_duration:
             embedding_size += hidden_size
         self.pre_conformer = nn.Linear(
@@ -152,6 +153,7 @@ def create_predictor(config: NetworkConfig) -> Predictor:
     )
     return Predictor(
         phoneme_size=config.phoneme_size,
+        phoneme_embedding_size=config.phoneme_embedding_size,
         hidden_size=config.hidden_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
