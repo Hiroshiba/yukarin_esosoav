@@ -7,34 +7,57 @@ from enum import Enum
 from pathlib import Path
 from typing import assert_never
 
+import fsspec
 import numpy
+from fsspec.implementations.local import LocalFileSystem
 from pydantic import TypeAdapter
 from torch.utils.data import Dataset as BaseDataset
+from upath import UPath
 
 from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
 from hiho_pytorch_base.data.data import InputData, OutputData, preprocess
 from hiho_pytorch_base.data.sampling_data import SamplingData
 
 
+def _to_local_path(p: UPath) -> Path:
+    """リモートならキャッシュを作ってそのパスを、ローカルならそのままそのパスを返す"""
+    if isinstance(p.fs, LocalFileSystem):
+        return Path(p)
+    obj = fsspec.open_local(
+        "simplecache::" + str(p), simplecache={"cache_storage": "./hiho_cache/"}
+    )
+    if isinstance(obj, list):
+        raise ValueError(f"複数のローカルパスが返されました: {p} -> {obj}")
+    return Path(obj)
+
+
 @dataclass
 class LazyInputData:
     """遅延読み込み対応の入力データ構造"""
 
-    feature_vector_path: Path
-    feature_variable_path: Path
-    target_vector_path: Path
-    target_variable_path: Path
-    target_scalar_path: Path
+    feature_vector_path: UPath
+    feature_variable_path: UPath
+    target_vector_path: UPath
+    target_variable_path: UPath
+    target_scalar_path: UPath
     speaker_id: int
 
     def generate(self) -> InputData:
         """ファイルからデータを読み込んでInputDataを生成"""
         return InputData(
-            feature_vector=numpy.load(self.feature_vector_path, allow_pickle=True),
-            feature_variable=numpy.load(self.feature_variable_path, allow_pickle=True),
-            target_vector=SamplingData.load(self.target_vector_path),
-            target_variable=SamplingData.load(self.target_variable_path),
-            target_scalar=float(numpy.load(self.target_scalar_path, allow_pickle=True)),
+            feature_vector=numpy.load(
+                _to_local_path(self.feature_vector_path), allow_pickle=True
+            ),
+            feature_variable=numpy.load(
+                _to_local_path(self.feature_variable_path), allow_pickle=True
+            ),
+            target_vector=SamplingData.load(_to_local_path(self.target_vector_path)),
+            target_variable=SamplingData.load(
+                _to_local_path(self.target_variable_path)
+            ),
+            target_scalar=float(
+                numpy.load(_to_local_path(self.target_scalar_path), allow_pickle=True)
+            ),
             speaker_id=self.speaker_id,
         )
 
@@ -115,25 +138,25 @@ class DatasetCollection:
                 assert_never(type)
 
 
-PathMap = dict[str, Path]
+PathMap = dict[str, UPath]
 """パスマップ。stemをキー、パスを値とする辞書型"""
 
 
-def _load_pathlist(pathlist_path: Path, root_dir: Path) -> PathMap:
+def _load_pathlist(pathlist_path: UPath, root_dir: UPath) -> PathMap:
     """pathlistファイルを読み込みんでパスマップを返す。"""
     path_list = [root_dir / p for p in pathlist_path.read_text().splitlines()]
     return {p.stem: p for p in path_list}
 
 
 def get_data_paths(
-    root_dir: Path | None, pathlist_paths: list[Path]
+    root_dir: UPath | None, pathlist_paths: list[UPath]
 ) -> tuple[list[str], list[PathMap]]:
     """複数のpathlistファイルからstemリストとパスマップを返す。整合性も確認する。"""
     if len(pathlist_paths) == 0:
         raise ValueError("少なくとも1つのpathlist設定が必要です")
 
     if root_dir is None:
-        root_dir = Path(".")
+        root_dir = UPath(".")
 
     path_mappings: list[PathMap] = []
 
