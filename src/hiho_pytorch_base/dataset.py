@@ -1,7 +1,7 @@
 """データセットモジュール"""
 
 import random
-from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -42,7 +42,7 @@ class LazyInputData:
     target_scalar_path: UPath
     speaker_id: int
 
-    def generate(self) -> InputData:
+    def fetch(self) -> InputData:
         """ファイルからデータを読み込んでInputDataを生成"""
         return InputData(
             feature_vector=numpy.load(
@@ -62,12 +62,22 @@ class LazyInputData:
         )
 
 
+def prefetch_datas(datas: list[LazyInputData], num_prefetch: int) -> None:
+    """データセットを前もって読み込む"""
+    if num_prefetch <= 0:
+        return
+
+    with ThreadPoolExecutor(max_workers=num_prefetch) as executor:
+        for data in datas:
+            executor.submit(data.fetch)
+
+
 class Dataset(BaseDataset[OutputData]):
     """メインのデータセット"""
 
     def __init__(
         self,
-        datas: Sequence[LazyInputData],
+        datas: list[LazyInputData],
         config: DatasetConfig,
         is_eval: bool,
     ):
@@ -83,7 +93,7 @@ class Dataset(BaseDataset[OutputData]):
         """指定されたインデックスのデータを前処理して返す"""
         try:
             return preprocess(
-                self.datas[i].generate(),
+                self.datas[i].fetch(),
                 frame_rate=self.config.frame_rate,
                 frame_length=self.config.frame_length,
                 is_eval=self.is_eval,
