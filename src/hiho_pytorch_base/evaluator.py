@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
-from torch.nn.functional import mse_loss
+from torch.nn.functional import binary_cross_entropy_with_logits, mse_loss
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
@@ -34,8 +34,6 @@ class Evaluator(nn.Module):
     @torch.no_grad()
     def forward(self, batch: BatchOutput) -> EvaluatorOutput:
         """データをネットワークに入力して評価値を計算する"""
-        # TODO: 適当な実装なので変更する
-
         output_result: GeneratorOutput = self.generator(
             phoneme_ids_list=batch.phoneme_ids_list,
             phoneme_durations_list=batch.phoneme_durations_list,
@@ -45,17 +43,28 @@ class Evaluator(nn.Module):
         )
 
         # 予測結果とターゲットを結合して一括計算
-        predicted_f0_all = torch.cat(output_result.f0, dim=0)  # (sum(vL),)
-        predicted_vuv_all = torch.cat(output_result.vuv, dim=0)  # (sum(vL),)
+        pred_f0_all = torch.cat(output_result.f0, dim=0)  # (sum(vL),)
+        pred_vuv_all = torch.cat(output_result.vuv, dim=0)  # (sum(vL),)
         target_f0_all = torch.cat(batch.vowel_f0_means_list, dim=0)  # (sum(vL),)
         target_vuv_all = torch.cat(batch.vowel_voiced_list, dim=0)  # (sum(vL),)
 
-        # MSE損失を計算
-        loss = mse_loss(predicted_f0_all, target_f0_all)
+        # vuv損失（全母音で計算）
+        vuv_loss = binary_cross_entropy_with_logits(
+            pred_vuv_all, target_vuv_all.float()
+        )
+
+        # F0損失（有声母音のみで計算）
+        voiced_mask = target_vuv_all  # (sum(vL),)
+        if voiced_mask.any():
+            f0_loss = mse_loss(pred_f0_all[voiced_mask], target_f0_all[voiced_mask])
+        else:
+            f0_loss = pred_f0_all.new_tensor(0.0)
+
+        loss = f0_loss + vuv_loss
 
         # 有声かどうかの精度
-        predicted_vuv_binary = predicted_vuv_all > 0.0
-        vuv_accuracy = (predicted_vuv_binary == target_vuv_all).float().mean()
+        pred_vuv_binary = pred_vuv_all > 0.0
+        vuv_accuracy = (pred_vuv_binary == target_vuv_all).float().mean()
 
         return EvaluatorOutput(
             loss=loss,
