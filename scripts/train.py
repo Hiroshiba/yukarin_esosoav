@@ -1,6 +1,7 @@
 """機械学習モデルの学習メインスクリプト"""
 
 import argparse
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.dataset import DatasetType, create_dataset
+from hiho_pytorch_base.dataset import DatasetType, create_dataset, prefetch_datas
 from hiho_pytorch_base.evaluator import (
     Evaluator,
     EvaluatorOutput,
@@ -104,12 +105,12 @@ def create_data_loader(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=config.train.num_processes,
+        num_workers=config.train.preprocess_workers,
         collate_fn=collate_dataset_output,
         pin_memory=config.train.use_gpu,
         drop_last=for_train,
-        timeout=0 if config.train.num_processes == 0 else 30,
-        persistent_workers=config.train.num_processes > 0,
+        timeout=0 if config.train.preprocess_workers == 0 else 30,
+        persistent_workers=config.train.preprocess_workers > 0,
     )
 
 
@@ -124,6 +125,14 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
     # dataset
     datasets = create_dataset(config.dataset)
+
+    # prefetch
+    datas = datasets.train.datas + datasets.test.datas
+    datas += datasets.eval.datas if datasets.eval is not None else []
+    datas += datasets.valid.datas if datasets.valid is not None else []
+    threading.Thread(
+        target=prefetch_datas, args=(datas, config.train.prefetch_workers), daemon=True
+    ).start()
 
     # data loader
     train_loader = create_data_loader(

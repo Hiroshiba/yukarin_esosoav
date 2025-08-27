@@ -327,7 +327,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
             index, dataset_type
         )
 
-        input_data = lazy_data.generate()
+        input_data = lazy_data.fetch()
         phonemes = input_data.phonemes
         f0_rate = input_data.f0_data.rate
 
@@ -343,7 +343,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
             index, dataset_type
         )
 
-        input_data = lazy_data.generate()
+        input_data = lazy_data.fetch()
         phonemes = input_data.phonemes
         f0_rate = input_data.f0_data.rate
 

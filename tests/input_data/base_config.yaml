@@ -41,7 +41,8 @@ train:
     name: "RAdamScheduleFree"
     lr: 0.003
   scheduler: null
-  num_processes: 0
+  prefetch_workers: 256
+  preprocess_workers: 0
   use_gpu: false
   use_amp: false
 
