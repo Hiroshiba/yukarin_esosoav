@@ -3,22 +3,27 @@
 from pathlib import Path
 from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
+from hiho_pytorch_base.utility.type_utility import UPathField
 
 
-class DataFileConfig(BaseModel):
+class _Model(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class DataFileConfig(_Model):
     """データファイルの設定"""
 
-    f0_pathlist_path: Path
-    volume_pathlist_path: Path
-    lab_pathlist_path: Path
-    speaker_dict_path: Path
-    root_dir: Path | None
+    f0_pathlist_path: UPathField
+    volume_pathlist_path: UPathField
+    lab_pathlist_path: UPathField
+    speaker_dict_path: UPathField
+    root_dir: UPathField | None
 
 
-class DatasetConfig(BaseModel):
+class DatasetConfig(_Model):
     """データセット全体の設定"""
 
     train: DataFileConfig
@@ -29,7 +34,7 @@ class DatasetConfig(BaseModel):
     seed: int = 0
 
 
-class NetworkConfig(BaseModel):
+class NetworkConfig(_Model):
     """ニューラルネットワークの設定"""
 
     phoneme_size: int
@@ -43,13 +48,13 @@ class NetworkConfig(BaseModel):
     input_phoneme_duration: bool
 
 
-class ModelConfig(BaseModel):
+class ModelConfig(_Model):
     """モデルの設定"""
 
     pass
 
 
-class TrainConfig(BaseModel):
+class TrainConfig(_Model):
     """学習の設定"""
 
     batch_size: int
@@ -68,7 +73,7 @@ class TrainConfig(BaseModel):
     use_amp: bool = True
 
 
-class ProjectConfig(BaseModel):
+class ProjectConfig(_Model):
     """プロジェクトの設定"""
 
     name: str
@@ -76,7 +81,7 @@ class ProjectConfig(BaseModel):
     category: str | None = None
 
 
-class Config(BaseModel):
+class Config(_Model):
     """機械学習の全設定"""
 
     dataset: DatasetConfig
