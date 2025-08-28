@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
-from torch.nn.functional import binary_cross_entropy_with_logits, mse_loss
+from torch.nn.functional import binary_cross_entropy_with_logits, l1_loss
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
@@ -56,7 +56,7 @@ class Evaluator(nn.Module):
         # F0損失（有声母音のみで計算）
         voiced_mask = target_vuv_all  # (sum(vL),)
         if voiced_mask.any():
-            f0_loss = mse_loss(pred_f0_all[voiced_mask], target_f0_all[voiced_mask])
+            f0_loss = l1_loss(pred_f0_all[voiced_mask], target_f0_all[voiced_mask])
         else:
             f0_loss = pred_f0_all.new_tensor(0.0)
 
