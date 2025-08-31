@@ -4,12 +4,9 @@ import random
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import assert_never
 
-import fsspec
 import numpy
-from fsspec.implementations.local import LocalFileSystem
 from pydantic import TypeAdapter
 from torch.utils.data import Dataset as BaseDataset
 from upath import UPath
@@ -17,18 +14,7 @@ from upath import UPath
 from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
 from hiho_pytorch_base.data.data import InputData, OutputData, preprocess
 from hiho_pytorch_base.data.sampling_data import SamplingData
-
-
-def _to_local_path(p: UPath) -> Path:
-    """リモートならキャッシュを作ってそのパスを、ローカルならそのままそのパスを返す"""
-    if isinstance(p.fs, LocalFileSystem):
-        return Path(p)
-    obj = fsspec.open_local(
-        "simplecache::" + str(p), simplecache={"cache_storage": "./hiho_cache/"}
-    )
-    if isinstance(obj, list):
-        raise ValueError(f"複数のローカルパスが返されました: {p} -> {obj}")
-    return Path(obj)
+from hiho_pytorch_base.utility.upath_utility import to_local_path
 
 
 @dataclass
@@ -46,17 +32,15 @@ class LazyInputData:
         """ファイルからデータを読み込んでInputDataを生成"""
         return InputData(
             feature_vector=numpy.load(
-                _to_local_path(self.feature_vector_path), allow_pickle=True
+                to_local_path(self.feature_vector_path), allow_pickle=True
             ),
             feature_variable=numpy.load(
-                _to_local_path(self.feature_variable_path), allow_pickle=True
+                to_local_path(self.feature_variable_path), allow_pickle=True
             ),
-            target_vector=SamplingData.load(_to_local_path(self.target_vector_path)),
-            target_variable=SamplingData.load(
-                _to_local_path(self.target_variable_path)
-            ),
+            target_vector=SamplingData.load(to_local_path(self.target_vector_path)),
+            target_variable=SamplingData.load(to_local_path(self.target_variable_path)),
             target_scalar=float(
-                numpy.load(_to_local_path(self.target_scalar_path), allow_pickle=True)
+                numpy.load(to_local_path(self.target_scalar_path), allow_pickle=True)
             ),
             speaker_id=self.speaker_id,
         )
