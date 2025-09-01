@@ -51,6 +51,7 @@ def prefetch_datas(datas: list[LazyInputData], num_prefetch: int) -> None:
     if num_prefetch <= 0:
         return
 
+    # TODO: これだとメインがエラーで落ちてもスレッドの完了を待ってしまうので、threading.Thread(daemon=True)に変えたい
     with ThreadPoolExecutor(max_workers=num_prefetch) as executor:
         for data in datas:
             executor.submit(data.fetch)
