@@ -1,12 +1,14 @@
 """評価値計算モジュール"""
 
 from dataclasses import dataclass
+from typing import Self
 
 import torch
 from torch import Tensor, nn
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
+from hiho_pytorch_base.utility.pytorch_utility import detach_cpu
 from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 
@@ -16,6 +18,12 @@ class EvaluatorOutput(DataNumProtocol):
 
     loss: Tensor
     accuracy: Tensor
+
+    def detach_cpu(self) -> Self:
+        """全てのTensorをdetachしてCPUに移動"""
+        self.loss = detach_cpu(self.loss)
+        self.accuracy = detach_cpu(self.accuracy)
+        return self
 
 
 def calculate_value(output: EvaluatorOutput) -> Tensor:
