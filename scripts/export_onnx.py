@@ -47,8 +47,8 @@ def export_onnx(config_yaml_path: Path, output_path: Path, verbose: bool) -> Non
     batch_size = 1
     max_length = 50
 
-    feature_vector = torch.randn(batch_size, config.network.feature_vector_size)
-    feature_variable = torch.randn(max_length, config.network.feature_variable_size)
+    feature_vector = torch.randn(batch_size, config.network.feature_vector_size)  # type: ignore 動かないので一旦無視
+    feature_variable = torch.randn(max_length, config.network.feature_variable_size)  # type: ignore 動かないので一旦無視
     speaker_id = torch.randint(0, config.network.speaker_size, (batch_size,))
 
     example_inputs = (feature_vector, feature_variable, speaker_id)

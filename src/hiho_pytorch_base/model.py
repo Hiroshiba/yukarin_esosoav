@@ -1,6 +1,7 @@
 """モデルのモジュール。ネットワークの出力から損失を計算する。"""
 
 from dataclasses import dataclass
+from typing import Self
 
 import torch
 from torch import Tensor, nn
@@ -9,6 +10,7 @@ from torch.nn.functional import binary_cross_entropy_with_logits, l1_loss
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.config import ModelConfig
 from hiho_pytorch_base.network.predictor import Predictor
+from hiho_pytorch_base.utility.pytorch_utility import detach_cpu
 from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 
@@ -24,6 +26,13 @@ class ModelOutput(DataNumProtocol):
 
     vuv_loss: Tensor
     """vuv損失"""
+
+    def detach_cpu(self) -> Self:
+        """全てのTensorをdetachしてCPUに移動"""
+        self.loss = detach_cpu(self.loss)
+        self.f0_loss = detach_cpu(self.f0_loss)
+        self.vuv_loss = detach_cpu(self.vuv_loss)
+        return self
 
 
 class Model(nn.Module):

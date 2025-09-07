@@ -2,6 +2,7 @@
 
 import argparse
 import threading
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,7 @@ import torch
 import yaml
 from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
@@ -24,7 +25,6 @@ from hiho_pytorch_base.generator import Generator
 from hiho_pytorch_base.model import Model, ModelOutput
 from hiho_pytorch_base.network.predictor import Predictor, create_predictor
 from hiho_pytorch_base.utility.pytorch_utility import (
-    detach_cpu,
     init_weights,
     make_optimizer,
     make_scheduler,
@@ -96,15 +96,47 @@ class TrainingContext:
     snapshot_path: Path
 
 
+class FirstEpochOrderedSampler(Sampler[int]):
+    """初回エポックは指定順序、以降はランダムサンプリング。prefetchに有効。"""
+
+    def __init__(self, first_indices: list[int]) -> None:
+        self.first_indices = first_indices
+        self.first_epoch = True
+
+    def __iter__(self) -> Iterator[int]:  # noqa: D105
+        if self.first_epoch:
+            self.first_epoch = False
+            return iter(self.first_indices)
+        else:
+            indices_tensor = torch.tensor(self.first_indices)
+            return iter(indices_tensor[torch.randperm(len(indices_tensor))].tolist())
+
+    def __len__(self) -> int:  # noqa: D105
+        return len(self.first_indices)
+
+
 def create_data_loader(
-    config: Config, dataset: Dataset, for_train: bool, for_eval: bool
+    config: Config,
+    dataset: Dataset,
+    for_train: bool,
+    for_eval: bool,
+    first_indices: list[int] | None,
 ) -> DataLoader:
     """DataLoaderを作成"""
     batch_size = config.train.eval_batch_size if for_eval else config.train.batch_size
+
+    if first_indices is not None:
+        sampler = FirstEpochOrderedSampler(first_indices)
+        shuffle = False
+    else:
+        sampler = None
+        shuffle = True
+
     return DataLoader(
         dataset=dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle,
+        sampler=sampler,
         num_workers=config.train.preprocess_workers,
         collate_fn=collate_dataset_output,
         pin_memory=config.train.use_gpu,
@@ -127,6 +159,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     datasets = create_dataset(config.dataset)
 
     # prefetch
+    train_indices = torch.randperm(len(datasets.train)).tolist()
     datas = datasets.train.datas + datasets.test.datas
     datas += datasets.eval.datas if datasets.eval is not None else []
     datas += datasets.valid.datas if datasets.valid is not None else []
@@ -136,18 +169,26 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
     # data loader
     train_loader = create_data_loader(
-        config, datasets.train, for_train=True, for_eval=False
+        config,
+        datasets.train,
+        for_train=True,
+        for_eval=False,
+        first_indices=train_indices,
     )
     test_loader = create_data_loader(
-        config, datasets.test, for_train=False, for_eval=False
+        config, datasets.test, for_train=False, for_eval=False, first_indices=None
     )
     eval_loader = (
-        create_data_loader(config, datasets.eval, for_train=False, for_eval=True)
+        create_data_loader(
+            config, datasets.eval, for_train=False, for_eval=True, first_indices=None
+        )
         if datasets.eval is not None
         else None
     )
     valid_loader = (
-        create_data_loader(config, datasets.valid, for_train=False, for_eval=True)
+        create_data_loader(
+            config, datasets.valid, for_train=False, for_eval=True, first_indices=None
+        )
         if datasets.valid is not None
         else None
     )
@@ -263,7 +304,7 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
         context.scaler.step(context.optimizer)
         context.scaler.update()
 
-        train_results.append(detach_cpu(result))
+        train_results.append(result.detach_cpu())
 
     if context.scheduler is not None:
         context.scheduler.step()
@@ -284,8 +325,8 @@ def evaluate(context: TrainingContext) -> EvaluationResults:
     test_result_list: list[ModelOutput] = []
     for batch in context.test_loader:
         batch = batch.to_device(context.device, non_blocking=True)
-        result = context.model(batch)
-        test_result_list.append(detach_cpu(result))
+        model_result: ModelOutput = context.model(batch)
+        test_result_list.append(model_result.detach_cpu())
     test_result = reduce_result(test_result_list)
 
     # eval評価
@@ -294,8 +335,8 @@ def evaluate(context: TrainingContext) -> EvaluationResults:
         eval_result_list: list[EvaluatorOutput] = []
         for batch in context.eval_loader:
             batch = batch.to_device(context.device, non_blocking=True)
-            result = context.evaluator(batch)
-            eval_result_list.append(detach_cpu(result))
+            evaluator_result: EvaluatorOutput = context.evaluator(batch)
+            eval_result_list.append(evaluator_result.detach_cpu())
         eval_result = reduce_result(eval_result_list)
 
     # valid評価
@@ -304,8 +345,8 @@ def evaluate(context: TrainingContext) -> EvaluationResults:
         valid_result_list: list[EvaluatorOutput] = []
         for batch in context.valid_loader:
             batch = batch.to_device(context.device, non_blocking=True)
-            result = context.evaluator(batch)
-            valid_result_list.append(detach_cpu(result))
+            evaluator_result: EvaluatorOutput = context.evaluator(batch)
+            valid_result_list.append(evaluator_result.detach_cpu())
         valid_result = reduce_result(valid_result_list)
 
     return EvaluationResults(test=test_result, eval=eval_result, valid=valid_result)

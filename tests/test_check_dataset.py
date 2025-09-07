@@ -1,7 +1,6 @@
 """check_dataset.pyのテスト"""
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 import yaml
@@ -18,7 +17,7 @@ def test_check_dataset_basic(train_config: Config, tmp_path: Path) -> None:
         yaml.dump(train_config.to_dict(), f)
 
     # 正常に実行されることを確認（例外が発生しないことをチェック）
-    check_dataset(config_path, trials=1)
+    check_dataset(config_path, trials=1, break_on_error=False)
 
 
 def test_check_dataset_with_missing_data_files(
@@ -29,13 +28,12 @@ def test_check_dataset_with_missing_data_files(
 
     # 存在しないパスに変更
     config_dict = train_config.to_dict()
-    config_dict["dataset"]["train"]["feature_vector_pathlist_path"] = (
+    config_dict["dataset"]["train"]["f0_pathlist_path"] = (
         "non_existent_pathlist.txt"
     )
 
     with config_path.open("w") as f:
         yaml.dump(config_dict, f)
 
-    with patch("builtins.breakpoint"):  # NOTE: breakpointをモック化
-        with pytest.raises(FileNotFoundError):
-            check_dataset(config_path, trials=1)
+    with pytest.raises(FileNotFoundError):
+        check_dataset(config_path, trials=1, break_on_error=False)

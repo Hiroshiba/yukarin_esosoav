@@ -1,6 +1,7 @@
 """評価値計算モジュール"""
 
 from dataclasses import dataclass
+from typing import Self
 
 import torch
 from torch import Tensor, nn
@@ -8,6 +9,7 @@ from torch.nn.functional import binary_cross_entropy_with_logits, l1_loss
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.generator import Generator, GeneratorOutput
+from hiho_pytorch_base.utility.pytorch_utility import detach_cpu
 from hiho_pytorch_base.utility.train_utility import DataNumProtocol
 
 
@@ -17,6 +19,12 @@ class EvaluatorOutput(DataNumProtocol):
 
     loss: Tensor
     vuv_accuracy: Tensor
+
+    def detach_cpu(self) -> Self:
+        """全てのTensorをdetachしてCPUに移動"""
+        self.loss = detach_cpu(self.loss)
+        self.vuv_accuracy = detach_cpu(self.vuv_accuracy)
+        return self
 
 
 def calculate_value(output: EvaluatorOutput) -> Tensor:

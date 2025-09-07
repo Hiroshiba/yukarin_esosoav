@@ -4,11 +4,8 @@ import random
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import assert_never
 
-import fsspec
-from fsspec.implementations.local import LocalFileSystem
 from pydantic import TypeAdapter
 from torch.utils.data import Dataset as BaseDataset
 from upath import UPath
@@ -21,18 +18,7 @@ from hiho_pytorch_base.data.data import (
 )
 from hiho_pytorch_base.data.phoneme import ArpaPhoneme
 from hiho_pytorch_base.data.sampling_data import SamplingData
-
-
-def _to_local_path(p: UPath) -> Path:
-    """リモートならキャッシュを作ってそのパスを、ローカルならそのままそのパスを返す"""
-    if isinstance(p.fs, LocalFileSystem):
-        return Path(p)
-    obj = fsspec.open_local(
-        "simplecache::" + str(p), simplecache={"cache_storage": "./hiho_cache/"}
-    )
-    if isinstance(obj, list):
-        raise ValueError(f"複数のローカルパスが返されました: {p} -> {obj}")
-    return Path(obj)
+from hiho_pytorch_base.utility.upath_utility import to_local_path
 
 
 @dataclass
@@ -47,9 +33,9 @@ class LazyInputData:
     def fetch(self) -> InputData:
         """ファイルからデータを読み込んでDatasetInputを生成"""
         return InputData(
-            phonemes=ArpaPhoneme.load_julius_list(_to_local_path(self.lab_path)),
-            f0_data=SamplingData.load(_to_local_path(self.f0_path)),
-            volume_data=SamplingData.load(_to_local_path(self.volume_path)),
+            phonemes=ArpaPhoneme.load_julius_list(to_local_path(self.lab_path)),
+            f0_data=SamplingData.load(to_local_path(self.f0_path)),
+            volume_data=SamplingData.load(to_local_path(self.volume_path)),
             speaker_id=self.speaker_id,
         )
 
@@ -59,6 +45,7 @@ def prefetch_datas(datas: list[LazyInputData], num_prefetch: int) -> None:
     if num_prefetch <= 0:
         return
 
+    # TODO: これだとメインがエラーで落ちてもスレッドの完了を待ってしまうので、threading.Thread(daemon=True)に変えたい
     with ThreadPoolExecutor(max_workers=num_prefetch) as executor:
         for data in datas:
             executor.submit(data.fetch)
@@ -163,15 +150,15 @@ def get_data_paths(
     # 最初のpathlistをベースにstemリストを作成
     first_pathlist_path = pathlist_paths[0]
     first_paths = _load_pathlist(first_pathlist_path, root_dir)
-    fn_list = sorted(first_paths.keys())
+    fn_list = list(first_paths.keys())
     assert len(fn_list) > 0, f"ファイルが存在しません: {first_pathlist_path}"
 
     path_mappings.append(first_paths)
 
-    # 残りのpathlistが同じstemセットを持つかチェック
+    # 残りのpathlistが同じstemリストを持つかチェック
     for pathlist_path in pathlist_paths[1:]:
         paths = _load_pathlist(pathlist_path, root_dir)
-        assert set(fn_list) == set(paths.keys()), (
+        assert fn_list == list(paths.keys()), (
             f"ファイルが一致しません: {pathlist_path} (expected: {len(fn_list)}, got: {len(paths)})"
         )
         path_mappings.append(paths)
