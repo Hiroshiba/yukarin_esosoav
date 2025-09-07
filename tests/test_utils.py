@@ -51,16 +51,16 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
             valid_pathlist_path.write_text("\n".join(all_relative_paths[train_num:]))
 
     # 共通のフレーム長を生成（F0とvolumeで一致させる）
-    np.random.seed(42)  # 再現性のため
-    frame_lengths = {stem: int(np.random.randint(50, 200)) for stem in all_stems}
+    rng = np.random.default_rng(42)  # 再現性のため
+    frame_lengths = {stem: int(rng.integers(50, 200)) for stem in all_stems}
 
     # F0データ
     def generate_f0(file_path: Path) -> None:
         stem = file_path.stem
         f0_length = frame_lengths[stem]
-        f0_data = np.random.uniform(80, 300, f0_length).astype(np.float32)  # F0値 (Hz)
+        f0_data = rng.uniform(80, 300, f0_length).astype(np.float32)  # F0値 (Hz)
         # 一部を無声（0）にする
-        unvoiced_mask = np.random.random(f0_length) < 0.3
+        unvoiced_mask = rng.random(f0_length) < 0.3
         f0_data[unvoiced_mask] = 0.0
         # SamplingDataで保存（200Hzのフレームレート）
         sampling_data = SamplingData(array=f0_data[:, np.newaxis], rate=200.0)
@@ -72,9 +72,7 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
     def generate_volume(file_path: Path) -> None:
         stem = file_path.stem
         volume_length = frame_lengths[stem]  # F0と同じ長さを使用
-        volume_data = np.random.uniform(-60, -20, volume_length).astype(
-            np.float32
-        )  # dB
+        volume_data = rng.uniform(-60, -20, volume_length).astype(np.float32)  # dB
         # SamplingDataで保存（200Hzのフレームレート）
         sampling_data = SamplingData(array=volume_data[:, np.newaxis], rate=200.0)
         sampling_data.save(file_path)
@@ -95,16 +93,16 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
         consonant_phonemes = ["pau", "B", "T", "NG", "K"]
         phoneme_names = vowel_phonemes + consonant_phonemes
 
-        num_phonemes = int(np.random.randint(3, 8))
+        num_phonemes = int(rng.integers(3, 8))
         # 最低1つの母音を保証
-        selected_phonemes = [np.random.choice(vowel_phonemes)]
+        selected_phonemes = [rng.choice(vowel_phonemes)]
         remaining_count = num_phonemes - 1
         if remaining_count > 0:
-            selected_phonemes.extend(np.random.choice(phoneme_names, remaining_count))
+            selected_phonemes.extend(rng.choice(phoneme_names, remaining_count))
         selected_phonemes = np.array(selected_phonemes[:num_phonemes])
 
         # 音素の継続時間を総時間に比例配分
-        duration_weights = np.random.uniform(0.5, 2.0, num_phonemes)
+        duration_weights = rng.uniform(0.5, 2.0, num_phonemes)
         duration_weights = duration_weights / np.sum(duration_weights)  # 正規化
         durations = duration_weights * total_duration  # 総時間に合わせる
 

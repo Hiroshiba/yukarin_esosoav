@@ -1,3 +1,5 @@
+"""音素データ処理モジュール"""
+
 from abc import abstractmethod
 from os import PathLike
 from pathlib import Path
@@ -7,6 +9,8 @@ import numpy
 
 
 class BasePhoneme:
+    """基底音素クラス"""
+
     phoneme_list: tuple[str, ...]
     num_phoneme: int
     space_phoneme: str
@@ -21,34 +25,39 @@ class BasePhoneme:
         self.start = start
         self.end = end
 
-    def __repr__(self):
+    def __repr__(self):  # noqa: D105
         return f"Phoneme(phoneme='{self.phoneme}', start={self.start}, end={self.end})"
 
-    def __eq__(self, o: object):
+    def __eq__(self, o: object):  # noqa: D105
         return isinstance(o, BasePhoneme) and (
             self.phoneme == o.phoneme and self.start == o.start and self.end == o.end
         )
 
     def verify(self):
+        """音素データの検証を行う"""
         assert self.start < self.end, f"{self} start must be less than end"
         assert self.phoneme in self.phoneme_list, f"{self} is not defined."
 
     @property
     def phoneme_id(self):
+        """音素IDを取得する"""
         return self.phoneme_list.index(self.phoneme)
 
     @property
     def duration(self):
+        """音素の継続時間を取得する"""
         return self.end - self.start
 
     @property
     def onehot(self):
+        """ohehotベクトルを取得する"""
         array = numpy.zeros(self.num_phoneme, dtype=bool)
         array[self.phoneme_id] = True
         return array
 
     @classmethod
     def parse(cls, s: str):
+        """文字列から音素データを解析する"""
         words = s.split()
         return cls(
             start=float(words[0]),
@@ -59,10 +68,12 @@ class BasePhoneme:
     @classmethod
     @abstractmethod
     def convert(cls, phonemes: list[Self]) -> list[Self]:
+        """音素リストを変換する"""
         pass
 
     @classmethod
     def verify_list(cls: type[Self], phonemes: list[Self]):
+        """音素リストの検証する"""
         assert phonemes[0].start == 0, f"{phonemes[0]} start must be 0."
         for phoneme in phonemes:
             phoneme.verify()
@@ -71,6 +82,7 @@ class BasePhoneme:
 
     @classmethod
     def loads_julius_list(cls, text: str, verify=True):
+        """テキストからJulius形式の音素リストを読み込む"""
         phonemes = [cls.parse(s) for s in text.split("\n") if len(s) > 0]
         phonemes = cls.convert(phonemes)
 
@@ -83,6 +95,7 @@ class BasePhoneme:
 
     @classmethod
     def load_julius_list(cls, path: PathLike, verify=True):
+        """ファイルからJulius形式の音素リストを読み込む"""
         try:
             phonemes = cls.loads_julius_list(Path(path).read_text(), verify=verify)
         except Exception:
@@ -92,6 +105,7 @@ class BasePhoneme:
 
     @classmethod
     def save_julius_list(cls, phonemes: list[Self], path: PathLike, verify=True):
+        """Julius形式の音素リストをファイルに保存する"""
         if verify:
             try:
                 cls.verify_list(phonemes)
@@ -104,6 +118,8 @@ class BasePhoneme:
 
 
 class ArpaPhoneme(BasePhoneme):
+    """ARPABET音素クラス"""
+
     vowel_phonemes = (
         "AA",
         "AE",

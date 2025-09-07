@@ -9,9 +9,7 @@ from hiho_pytorch_base.config import Config
 from scripts.export_onnx import export_onnx
 
 
-@pytest.mark.skip(
-    reason="Predictorで使用されているpad_sequenceがサポートされていない"
-)
+@pytest.mark.skip(reason="Predictorで使用されているpad_sequenceがサポートされていない")
 def test_export_onnx_basic(train_config: Config, tmp_path: Path) -> None:
     """基本的なexport_onnx実行テスト"""
     config_path = tmp_path / "test_config.yaml"

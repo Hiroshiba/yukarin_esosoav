@@ -28,9 +28,7 @@ def test_check_dataset_with_missing_data_files(
 
     # 存在しないパスに変更
     config_dict = train_config.to_dict()
-    config_dict["dataset"]["train"]["f0_pathlist_path"] = (
-        "non_existent_pathlist.txt"
-    )
+    config_dict["dataset"]["train"]["f0_pathlist_path"] = "non_existent_pathlist.txt"
 
     with config_path.open("w") as f:
         yaml.dump(config_dict, f)
