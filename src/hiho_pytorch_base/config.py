@@ -30,6 +30,7 @@ class DatasetConfig(_Model):
 
     train: DataFileConfig
     valid: DataFileConfig | None = None
+    train_num: int | None = None
     test_num: int
     eval_for_test: bool
     eval_times_num: int = 1
