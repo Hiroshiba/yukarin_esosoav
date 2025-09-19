@@ -28,6 +28,8 @@ class LazyInputData:
     f0_path: UPath
     volume_path: UPath
     lab_path: UPath
+    silence_path: UPath
+    spec_path: UPath  # NOTE: 対数メルスペクトログラム
     speaker_id: int
 
     def fetch(self) -> InputData:
@@ -36,6 +38,8 @@ class LazyInputData:
             phonemes=ArpaPhoneme.load_julius_list(to_local_path(self.lab_path)),
             f0_data=SamplingData.load(to_local_path(self.f0_path)),
             volume_data=SamplingData.load(to_local_path(self.volume_path)),
+            silence_data=SamplingData.load(to_local_path(self.silence_path)),
+            spec_data=SamplingData.load(to_local_path(self.spec_path)),
             speaker_id=self.speaker_id,
         )
 
@@ -73,6 +77,8 @@ class Dataset(BaseDataset[OutputData]):
         try:
             return preprocess(
                 self.datas[i].fetch(),
+                prepost_silence_length=self.config.prepost_silence_length,
+                max_sampling_length=self.config.max_sampling_length,
                 is_eval=self.is_eval,
             )
         except Exception as e:
@@ -174,6 +180,8 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             f0_pathmappings,
             volume_pathmappings,
             lab_pathmappings,
+            silence_pathmappings,
+            spec_pathmappings,
         ),
     ) = get_data_paths(
         config.root_dir,
@@ -181,6 +189,8 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             config.f0_pathlist_path,
             config.volume_pathlist_path,
             config.lab_pathlist_path,
+            config.silence_pathlist_path,
+            config.spec_pathlist_path,
         ],
     )
 
@@ -198,6 +208,8 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             f0_path=f0_pathmappings[fn],
             volume_path=volume_pathmappings[fn],
             lab_path=lab_pathmappings[fn],
+            silence_path=silence_pathmappings[fn],
+            spec_path=spec_pathmappings[fn],
             speaker_id=speaker_ids[fn],
         )
         for fn in fn_list

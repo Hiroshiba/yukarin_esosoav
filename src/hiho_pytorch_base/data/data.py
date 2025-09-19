@@ -7,16 +7,21 @@ import torch
 from torch import Tensor
 
 from hiho_pytorch_base.data.phoneme import ArpaPhoneme
-from hiho_pytorch_base.data.sampling_data import ResampleInterpolateKind, SamplingData
+from hiho_pytorch_base.data.sampling_data import (
+    ResampleInterpolateKind,
+    SamplingData,
+)
 
 
 @dataclass
 class InputData:
-    """データ処理前のデータ構造（SamplingData + ArpaPhonemeリストベース）"""
+    """データ処理前のデータ構造"""
 
-    phonemes: list[ArpaPhoneme]  # 音素のリスト（ストレス情報含む）
-    f0_data: SamplingData  # F0のSamplingData
-    volume_data: SamplingData  # volumeのSamplingData
+    phonemes: list[ArpaPhoneme]
+    f0_data: SamplingData
+    volume_data: SamplingData
+    silence_data: SamplingData
+    spec_data: SamplingData  # NOTE: 対数メルスペクトログラム
     speaker_id: int
 
 
@@ -24,25 +29,39 @@ class InputData:
 class OutputData:
     """データ処理後のデータ構造"""
 
-    phoneme_id: Tensor  # (L,) 音素ID
-    phoneme_duration: Tensor  # (L,) 音素継続時間
-    phoneme_stress: Tensor  # (L,) 全音素のストレス値（子音=0、母音=1-3）
-    f0: Tensor  # (T,) F0
-    volume: Tensor  # (T,) 音量
-    vowel_f0_means: Tensor  # (vL,) 各母音のF0
-    vowel_voiced: Tensor  # (vL,) 各母音が有声か
-    vowel_index: Tensor  # (vL,) 音素列のなかで母音のインデックス
+    f0: Tensor  # (L,)
+    phoneme: Tensor  # (L,)
+    spec: Tensor  # (L, ?) NOTE: 対数メルスペクトログラム
     speaker_id: Tensor
 
 
-def calculate_vowel_f0_weighted_mean(
+def get_notsilence_range(silence: numpy.ndarray, prepost_silence_length: int):
+    """
+    最初と最後の無音を除去したrangeを返す。
+
+    一番最初や最後が無音でない場合はノイズとみなしてその区間も除去する。
+    最小でもprepost_silence_lengthだけは確保する。
+    """
+    length = len(silence)
+
+    ps = numpy.argwhere(numpy.logical_and(silence[:-1], ~silence[1:]))
+    pre_length = ps[0][0] + 1 if len(ps) > 0 else 0
+    pre_index = max(0, pre_length - prepost_silence_length)
+
+    ps = numpy.argwhere(numpy.logical_and(~silence[:-1], silence[1:]))
+    post_length = length - (ps[-1][0] + 1) if len(ps) > 0 else 0
+    post_index = length - max(0, post_length - prepost_silence_length)
+    return range(pre_index, post_index)
+
+
+def create_frame_vowel_f0s(
     f0: numpy.ndarray,
     volume: numpy.ndarray,
     vowel_index: numpy.ndarray,
     durations: numpy.ndarray,
     frame_rate: float,
 ) -> numpy.ndarray:
-    """母音区間でのF0重み付け平均を計算する"""
+    """母音ごとの重み付け平均を計算し、フレームにブロードキャストする"""
     if len(vowel_index) == 0:
         raise ValueError(
             "母音インデックスが空です。LABファイルに母音が含まれていない可能性があります。"
@@ -63,7 +82,9 @@ def calculate_vowel_f0_weighted_mean(
     volume_amplitude = numpy.power(10, volume / 20.0)
 
     # 各母音セグメントを処理
-    vowel_f0_means = []
+    frame_length = int(phoneme_times[-1] * frame_rate)
+    output_f0 = numpy.zeros(frame_length, dtype=numpy.float32)
+
     for start_frame, end_frame in zip(
         vowel_start_frames, vowel_end_frames, strict=True
     ):
@@ -77,106 +98,122 @@ def calculate_vowel_f0_weighted_mean(
             weighted_mean = numpy.sum(
                 f0_segment[valid_mask] * volume_segment[valid_mask]
             ) / numpy.sum(volume_segment[valid_mask])
-            vowel_f0_means.append(weighted_mean)
+            value = weighted_mean
         else:
-            vowel_f0_means.append(0.0)
+            value = 0.0
+        output_f0[start_frame:end_frame] = value
 
-    return numpy.array(vowel_f0_means)
+    return output_f0
 
 
-def preprocess(d: InputData, is_eval: bool) -> OutputData:
+def create_frame_phoneme_ids(
+    phonemes: list[ArpaPhoneme], frame_rate: float
+) -> numpy.ndarray:
+    """音素継続時間からフレームごとの音素ID配列を生成する"""
+    frame_length = int(phonemes[-1].end * frame_rate)
+    phoneme_ids = numpy.zeros(frame_length, dtype=numpy.int64)
+
+    for phoneme in phonemes:
+        start_frame = int(phoneme.start * frame_rate)
+        end_frame = int(phoneme.end * frame_rate)
+        end_frame = min(end_frame, frame_length)
+        pid = ArpaPhoneme.phoneme_list.index(phoneme.phoneme)
+        phoneme_ids[start_frame:end_frame] = pid
+
+    return phoneme_ids
+
+
+def preprocess(
+    d: InputData,
+    prepost_silence_length: int,
+    max_sampling_length: int,
+    is_eval: bool,
+) -> OutputData:
     """全ての変換・検証・配列化処理を統合"""
-    # F0とボリュームのデータを取得
-    f0 = d.f0_data.array
-    volume = d.volume_data.array
-
     # リサンプリング
-    frame_rate = d.f0_data.rate
-    if abs(frame_rate - d.volume_data.rate) > 1e-4:
-        volume = d.volume_data.resample(
-            sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
-        )
-
-    # F0と音量の整合性チェック
-    # NOTE: 処理精度を考慮して3フレーム以内の誤差は許容する
-    if abs(len(f0) - len(volume)) > 3:
-        raise ValueError(
-            f"F0と音量データの長さが一致しません:\n"
-            f"  F0長:   {len(f0)}\n"
-            f"  音量長: {len(volume)}\n"
-            f"  許容範囲: 3フレーム以内"
-        )
-
-    # 長さを統一
-    frame_length = min(len(f0), len(volume))
-    f0 = f0[:frame_length]
-    volume = volume[:frame_length]
-
-    # 音素情報の抽出
-    phoneme_ids = numpy.array(
-        [ArpaPhoneme.phoneme_list.index(p.phoneme) for p in d.phonemes],
-        dtype=numpy.int32,
+    frame_rate = float(d.spec_data.rate)
+    f0 = d.f0_data.resample(
+        sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
     )
+    volume = d.volume_data.resample(
+        sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
+    )
+    silence = d.silence_data.resample(
+        sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
+    )
+    spec = d.spec_data.array
+
+    phoneme_id = create_frame_phoneme_ids(d.phonemes, frame_rate=frame_rate)
+
+    # 母音ごとのF0重み付け平均を計算
     phoneme_durations = numpy.array(
         [p.duration for p in d.phonemes], dtype=numpy.float32
     )
-
-    # フレームレベルと音素レベルの整合性チェック
-    # NOTE: 処理精度を考慮して3フレーム以内の誤差は許容する
-    phoneme_duration = numpy.sum(phoneme_durations)
-    phoneme_frame_length = int(phoneme_duration * frame_rate)
-    if abs(frame_length - phoneme_frame_length) > 3:
-        raise ValueError(
-            f"LABファイルとフレーム数が一致しません:\n"
-            f"  フレーム数:     {frame_length}\n"
-            f"  音素フレーム数: {phoneme_frame_length}\n"
-            f"  許容範囲:      3フレーム以内"
-        )
-
-    # 母音とそのストレス値を抽出
     vowel_indices = [
         i
         for i, phoneme in enumerate(d.phonemes)
         if ArpaPhoneme.is_vowel(phoneme.phoneme)
     ]
-
-    # 全音素のストレス値を作成（子音=0、母音=1-3）
-    phoneme_stresses = []
-    for phoneme in d.phonemes:
-        if ArpaPhoneme.is_vowel(phoneme.phoneme):
-            if phoneme.stress is None:
-                raise ValueError(
-                    f"母音 '{phoneme.phoneme}' にストレス値が設定されていません"
-                )
-            stress_value = phoneme.stress + 1  # 0,1,2 -> 1,2,3
-            phoneme_stresses.append(stress_value)
-        else:
-            phoneme_stresses.append(0)  # 子音は0
-
-    vowel_index = numpy.array(vowel_indices)
-    phoneme_stress = numpy.array(phoneme_stresses)
-
-    # 母音ごとのF0重み付け平均を計算
-    vowel_f0_means = calculate_vowel_f0_weighted_mean(
+    f0 = create_frame_vowel_f0s(
         f0=f0,
         volume=volume,
-        vowel_index=vowel_index,
+        vowel_index=numpy.array(vowel_indices),
         durations=phoneme_durations,
         frame_rate=frame_rate,
     )
 
-    # 有声か
-    vowel_voiced = vowel_f0_means > 0
+    # 長さと一貫性の検証（許容誤差は3フレーム）
+    len_spec = int(len(spec))
+    len_f0 = int(len(f0))
+    len_vol = int(len(volume))
+    len_lab = int(len(phoneme_id))
+    len_sil = int(len(silence))
+
+    def _check_pair(a: int, b: int, what: str) -> None:
+        if abs(a - b) > 3:
+            raise ValueError(
+                f"{what} の長さが一致しません: {a} vs {b} (許容:3フレーム)"
+            )
+
+    _check_pair(len_spec, len_f0, "spec と f0")
+    _check_pair(len_spec, len_vol, "spec と volume")
+    _check_pair(len_spec, len_lab, "spec と LAB 由来フレーム数")
+    _check_pair(len_spec, len_sil, "spec と silence")
+
+    # 長さを統一
+    frame_length = min(len_spec, len_f0, len_vol, len_lab, len_sil)
+    spec = spec[:frame_length]
+    f0 = f0[:frame_length]
+    volume = volume[:frame_length]
+    silence = silence[:frame_length]
+    phoneme_id = phoneme_id[:frame_length]
+
+    # 最初と最後の無音を除去
+    notsilence_range = get_notsilence_range(
+        silence=silence, prepost_silence_length=prepost_silence_length
+    )
+    f0 = f0[notsilence_range]
+    phoneme_id = phoneme_id[notsilence_range]
+    spec = spec[notsilence_range]
+
+    # 最大サンプリング長
+    length = len(f0)
+    if length > max_sampling_length:
+        if is_eval:
+            offset = 0
+        else:
+            offset = numpy.random.default_rng().integers(
+                length - max_sampling_length + 1
+            )
+        s = slice(offset, offset + max_sampling_length)
+        f0 = f0[s]
+        phoneme_id = phoneme_id[s]
+        spec = spec[s]
 
     # Tensor変換
     return OutputData(
-        phoneme_id=torch.from_numpy(phoneme_ids).long(),
-        phoneme_duration=torch.from_numpy(phoneme_durations).float(),
-        phoneme_stress=torch.from_numpy(phoneme_stress).long(),
         f0=torch.from_numpy(f0).float(),
-        volume=torch.from_numpy(volume).float(),
-        vowel_f0_means=torch.from_numpy(vowel_f0_means).float(),
-        vowel_voiced=torch.from_numpy(vowel_voiced).bool(),
-        vowel_index=torch.from_numpy(vowel_index).long(),
+        phoneme=torch.from_numpy(phoneme_id).long(),
+        spec=torch.from_numpy(spec).float(),
         speaker_id=torch.tensor(d.speaker_id).long(),
     )

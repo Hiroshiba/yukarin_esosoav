@@ -5,7 +5,7 @@ from typing import Self
 
 import torch
 from torch import Tensor, nn
-from torch.nn.functional import binary_cross_entropy_with_logits, l1_loss
+from torch.nn.functional import l1_loss
 
 from hiho_pytorch_base.batch import BatchOutput
 from hiho_pytorch_base.config import ModelConfig
@@ -21,17 +21,17 @@ class ModelOutput(DataNumProtocol):
     loss: Tensor
     """逆伝播させる損失"""
 
-    f0_loss: Tensor
-    """F0損失"""
+    loss1: Tensor
+    """PostNet前の損失"""
 
-    vuv_loss: Tensor
-    """vuv損失"""
+    loss2: Tensor
+    """PostNet後の損失"""
 
     def detach_cpu(self) -> Self:
         """全てのTensorをdetachしてCPUに移動"""
         self.loss = detach_cpu(self.loss)
-        self.f0_loss = detach_cpu(self.f0_loss)
-        self.vuv_loss = detach_cpu(self.vuv_loss)
+        self.loss1 = detach_cpu(self.loss1)
+        self.loss2 = detach_cpu(self.loss2)
         return self
 
 
@@ -45,37 +45,23 @@ class Model(nn.Module):
 
     def forward(self, batch: BatchOutput) -> ModelOutput:
         """データをネットワークに入力して損失などを計算する"""
-        f0_output_list, vuv_output_list = self.predictor(
-            phoneme_ids_list=batch.phoneme_ids_list,
-            phoneme_durations_list=batch.phoneme_durations_list,
-            phoneme_stress_list=batch.phoneme_stress_list,
-            vowel_index_list=batch.vowel_index_list,
+        output1_list, output2_list = self.predictor(
+            f0_list=batch.f0_list,
+            phoneme_list=batch.phoneme_list,
             speaker_id=batch.speaker_id,
-        )  # [(vL,)], [(vL,)]
+        )  # [(L, ?)], [(L, ?)]
 
-        # 一括で損失計算
-        pred_f0_all = torch.cat(f0_output_list, dim=0)  # (sum(vL),)
-        pred_vuv_all = torch.cat(vuv_output_list, dim=0)  # (sum(vL),)
-        target_f0_all = torch.cat(batch.vowel_f0_means_list, dim=0)  # (sum(vL),)
-        target_vuv_all = torch.cat(batch.vowel_voiced_list, dim=0)  # (sum(vL),)
+        pred1_all = torch.cat(output1_list, dim=0)  # (sum(L), ?)
+        pred2_all = torch.cat(output2_list, dim=0)  # (sum(L), ?)
+        target_all = torch.cat(batch.spec_list, dim=0)  # (sum(L), ?)
 
-        # vuv損失（全母音で計算）
-        vuv_loss = binary_cross_entropy_with_logits(
-            pred_vuv_all, target_vuv_all.float()
-        )
-
-        # F0損失（有声母音のみで計算）
-        voiced_mask = target_vuv_all  # (sum(vL),)
-        if voiced_mask.any():
-            f0_loss = l1_loss(pred_f0_all[voiced_mask], target_f0_all[voiced_mask])
-        else:
-            f0_loss = pred_f0_all.new_tensor(0.0)
-
-        loss = f0_loss + vuv_loss
+        loss1 = l1_loss(pred1_all, target_all)
+        loss2 = l1_loss(pred2_all, target_all)
+        loss = loss1 + loss2
 
         return ModelOutput(
             loss=loss,
-            f0_loss=f0_loss,
-            vuv_loss=vuv_loss,
+            loss1=loss1,
+            loss2=loss2,
             data_num=batch.data_num,
         )

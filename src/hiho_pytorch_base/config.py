@@ -19,6 +19,8 @@ class DataFileConfig(_Model):
     f0_pathlist_path: UPathField
     volume_pathlist_path: UPathField
     lab_pathlist_path: UPathField
+    silence_pathlist_path: UPathField
+    spec_pathlist_path: UPathField
     speaker_dict_path: UPathField
     root_dir: UPathField | None
 
@@ -28,6 +30,8 @@ class DatasetConfig(_Model):
 
     train: DataFileConfig
     valid: DataFileConfig | None = None
+    prepost_silence_length: int
+    max_sampling_length: int
     test_num: int
     eval_for_test: bool
     eval_times_num: int = 1
@@ -39,13 +43,16 @@ class NetworkConfig(_Model):
 
     phoneme_size: int
     phoneme_embedding_size: int
+    f0_embedding_size: int
     hidden_size: int
     conformer_block_num: int
     conformer_dropout_rate: float
     speaker_size: int
     speaker_embedding_size: int
-    stress_embedding_size: int
-    input_phoneme_duration: bool
+    output_size: int
+    postnet_layers: int
+    postnet_kernel_size: int
+    postnet_dropout: float
 
 
 class ModelConfig(_Model):

@@ -9,6 +9,64 @@ from hiho_pytorch_base.network.conformer.encoder import Encoder
 from hiho_pytorch_base.network.transformer.utility import make_non_pad_mask
 
 
+class PostNet(nn.Module):
+    """出力後処理用の畳み込みスタック"""
+
+    def __init__(
+        self,
+        channels: int,
+        hidden_channels: int,
+        layers: int,
+        kernel_size: int,
+        dropout: float,
+    ):
+        super().__init__()
+
+        blocks: list[nn.Module] = []
+        for layer in range(layers - 1):
+            in_ch = channels if layer == 0 else hidden_channels
+            out_ch = hidden_channels
+            blocks.append(
+                nn.Sequential(
+                    nn.Conv1d(
+                        in_channels=in_ch,
+                        out_channels=out_ch,
+                        kernel_size=kernel_size,
+                        stride=1,
+                        padding=(kernel_size - 1) // 2,
+                        bias=False,
+                    ),
+                    nn.BatchNorm1d(out_ch),
+                    nn.SiLU(),
+                    nn.Dropout(dropout),
+                )
+            )
+
+        in_ch = hidden_channels if layers != 1 else channels
+        blocks.append(
+            nn.Sequential(
+                nn.Conv1d(
+                    in_channels=in_ch,
+                    out_channels=channels,
+                    kernel_size=kernel_size,
+                    stride=1,
+                    padding=(kernel_size - 1) // 2,
+                    bias=False,
+                ),
+                nn.BatchNorm1d(channels),
+                nn.Dropout(dropout),
+            )
+        )
+
+        self.postnet = nn.Sequential(*blocks)
+
+    def forward(  # noqa: D102
+        self,
+        x: Tensor,  # (B, C, T)
+    ) -> Tensor:
+        return self.postnet(x)
+
+
 class Predictor(nn.Module):
     """メインのネットワーク"""
 
@@ -16,16 +74,20 @@ class Predictor(nn.Module):
         self,
         phoneme_size: int,
         phoneme_embedding_size: int,
+        f0_embedding_size: int,
         hidden_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
-        stress_embedding_size: int,
-        input_phoneme_duration: bool,
+        output_size: int,
         encoder: Encoder,
+        postnet_layers: int,
+        postnet_kernel_size: int,
+        postnet_dropout: float,
     ):
         super().__init__()
 
         self.hidden_size = hidden_size
+        self.output_size = output_size
 
         # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
         self.phoneme_embedder = nn.Sequential(
@@ -35,9 +97,6 @@ class Predictor(nn.Module):
             nn.Linear(phoneme_embedding_size, phoneme_embedding_size),
             nn.Linear(phoneme_embedding_size, phoneme_embedding_size),
         )
-        self.stress_embedder = nn.Embedding(
-            4, stress_embedding_size
-        )  # 子音=0, 母音=1-3
 
         # TODO: 推論時は行列演算を焼き込める。精度的にdoubleにする必要があるかも
         self.speaker_embedder = nn.Sequential(
@@ -47,92 +106,67 @@ class Predictor(nn.Module):
             nn.Linear(speaker_embedding_size, speaker_embedding_size),
             nn.Linear(speaker_embedding_size, speaker_embedding_size),
         )
+        self.f0_linear = nn.Linear(1, f0_embedding_size)
 
-        # 継続時間写像（オプション）
-        self.duration_linear = (
-            nn.Linear(1, hidden_size) if input_phoneme_duration else None
+        embedding_size = (
+            f0_embedding_size + phoneme_embedding_size + speaker_embedding_size
         )
-
-        # Conformer前の写像
-        embedding_size = phoneme_embedding_size + stress_embedding_size
-        if input_phoneme_duration:
-            embedding_size += hidden_size
-        self.pre_conformer = nn.Linear(
-            embedding_size + speaker_embedding_size, hidden_size
-        )
+        self.pre = nn.Linear(embedding_size, hidden_size)
 
         self.encoder = encoder
 
-        # 出力ヘッド
-        self.f0_head = nn.Linear(hidden_size, 1)  # F0予測用
-        self.vuv_head = nn.Linear(hidden_size, 1)  # vuv予測用
+        self.post = nn.Linear(hidden_size, output_size)
+        self.postnet = PostNet(
+            channels=output_size,
+            hidden_channels=hidden_size,
+            layers=postnet_layers,
+            kernel_size=postnet_kernel_size,
+            dropout=postnet_dropout,
+        )
 
     def forward(  # noqa: D102
         self,
         *,
-        phoneme_ids_list: list[Tensor],  # [(L,)]
-        phoneme_durations_list: list[Tensor],  # [(L,)]
-        phoneme_stress_list: list[Tensor],  # [(L,)]
-        vowel_index_list: list[Tensor],  # [(vL,)]
+        f0_list: list[Tensor],  # [(L,)]
+        phoneme_list: list[Tensor],  # [(L,)]
         speaker_id: Tensor,  # (B,)
-    ) -> tuple[list[Tensor], list[Tensor]]:  # f0_list [(vL,)], vuv_list [(vL,)]
+    ) -> tuple[list[Tensor], list[Tensor]]:  # [(L, ?)], [(L, ?)]
         device = speaker_id.device
-        batch_size = len(phoneme_ids_list)
+        batch_size = len(f0_list)
 
-        # シーケンスをパディング
-        phoneme_lengths = torch.tensor(
-            [seq.shape[0] for seq in phoneme_ids_list], device=device
-        )
-        padded_phoneme_ids = pad_sequence(phoneme_ids_list, batch_first=True)  # (B, L)
-        padded_durations = pad_sequence(
-            phoneme_durations_list, batch_first=True
-        )  # (B, L)
-        padded_phoneme_stress = pad_sequence(
-            phoneme_stress_list, batch_first=True
-        )  # (B, L)
+        lengths = torch.tensor([x.shape[0] for x in f0_list], device=device)
 
-        # 埋め込み
-        phoneme_embed = self.phoneme_embedder(padded_phoneme_ids)  # (B, L, ?)
-        stress_embed = self.stress_embedder(padded_phoneme_stress)  # (B, L, ?)
+        # パディング
+        f0 = pad_sequence(f0_list, batch_first=True)  # (B, L)
+        phoneme_ids = pad_sequence(phoneme_list, batch_first=True)  # (B, L)
 
-        # 話者埋め込み
-        speaker_embed = self.speaker_embedder(speaker_id)  # (B, ?)
-        max_length = padded_phoneme_ids.size(1)
-        speaker_embed = speaker_embed.unsqueeze(1).expand(
-            batch_size, max_length, -1
-        )  # (B, L, ?)
+        # 埋め込み・連結
+        h_phoneme = self.phoneme_embedder(phoneme_ids)  # (B, L, ?)
+        h_f0 = self.f0_linear(f0.unsqueeze(-1))  # (B, L, ?))
 
-        # 埋め込みを結合
-        h = torch.cat([phoneme_embed, stress_embed], dim=2)  # (B, L, ?)
+        h_speaker = self.speaker_embedder(speaker_id)  # (B, ?))
+        h_speaker = h_speaker.unsqueeze(1).expand(
+            batch_size, f0.size(1), -1
+        )  # (B, L, ?))
 
-        # 継続時間入力（オプション）
-        if self.duration_linear is not None:
-            duration_embed = self.duration_linear(
-                padded_durations.unsqueeze(-1)
-            )  # (B, L, ?)
-            h = torch.cat([h, duration_embed], dim=2)
+        h = torch.cat([h_f0, h_phoneme, h_speaker], dim=2)  # (B, L, ?))
+        h = self.pre(h)  # (B, L, ?))
 
-        # 話者情報を追加
-        h = torch.cat([h, speaker_embed], dim=2)  # (B, L, ?)
+        # マスク
+        mask = make_non_pad_mask(lengths).unsqueeze(-2).to(device)  # (B, 1, L)
 
-        # Conformer前の投影
-        h = self.pre_conformer(h)  # (B, L, ?)
+        # Conformer
+        h, _ = self.encoder(x=h, cond=None, mask=mask)  # (B, L, ?))
+        y1 = self.post(h)  # (B, L, ?))
 
-        # マスキング
-        mask = make_non_pad_mask(phoneme_lengths).unsqueeze(-2).to(device)  # (B, 1, L)
+        # PostNet
+        y2 = y1 + self.postnet(y1.transpose(1, 2)).transpose(1, 2)  # (B, L, ?))
 
-        # Conformerエンコーダ
-        h, _ = self.encoder(x=h, cond=None, mask=mask)  # (B, L, ?)
-
-        # 出力ヘッド - 全音素に対して予測
-        f0 = self.f0_head(h).squeeze(-1)  # (B, L)
-        vuv = self.vuv_head(h).squeeze(-1)  # (B, L)
-
-        # 母音位置でフィルタ
-        return (
-            [f0[i, vowel_indices] for i, vowel_indices in enumerate(vowel_index_list)],
-            [vuv[i, vowel_indices] for i, vowel_indices in enumerate(vowel_index_list)],
-        )
+        # リストに戻す
+        lengths_list: list[int] = lengths.tolist()
+        out1_list = [y1[i, :length] for i, length in enumerate(lengths_list)]
+        out2_list = [y2[i, :length] for i, length in enumerate(lengths_list)]
+        return out1_list, out2_list
 
 
 def create_predictor(config: NetworkConfig) -> Predictor:
@@ -154,10 +188,13 @@ def create_predictor(config: NetworkConfig) -> Predictor:
     return Predictor(
         phoneme_size=config.phoneme_size,
         phoneme_embedding_size=config.phoneme_embedding_size,
+        f0_embedding_size=config.f0_embedding_size,
         hidden_size=config.hidden_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
-        stress_embedding_size=config.stress_embedding_size,
-        input_phoneme_duration=config.input_phoneme_duration,
+        output_size=config.output_size,
         encoder=encoder,
+        postnet_layers=config.postnet_layers,
+        postnet_kernel_size=config.postnet_kernel_size,
+        postnet_dropout=config.postnet_dropout,
     )

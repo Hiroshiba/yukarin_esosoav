@@ -1,9 +1,15 @@
 """
-F0予測データセットの可視化ツール
+音響特徴量可視化ツール
 
-設定ファイルからDatasetCollectionを読み込み、F0・Volume・音素・ストレス情報をGradio UIで表示する。
-音素区間、ストレス情報、母音F0重心を統合的に可視化し、音声再生機能も提供する。
-LibriTTSデータセット対応。
+設定ファイルからDatasetCollectionを読み込み、フレーム単位で以下を可視化する:
+- フレームF0
+- 母音F0重心
+- ボリューム
+- 無音フラグ
+- 音素区間
+
+全ての系列はスペクトログラムのサンプリングレートに揃える。
+音素区間と母音F0重心を重ねて表示し、音声再生にも対応する。
 """
 
 import argparse
@@ -21,7 +27,7 @@ import yaml
 from matplotlib.figure import Figure
 
 from hiho_pytorch_base.config import Config
-from hiho_pytorch_base.data.data import OutputData
+from hiho_pytorch_base.data.data import OutputData, create_frame_vowel_f0s
 from hiho_pytorch_base.data.phoneme import ArpaPhoneme
 from hiho_pytorch_base.dataset import (
     Dataset,
@@ -149,74 +155,83 @@ LABデータパス: {lazy_data.lab_path}
 音声ファイル: {audio_path_str}"""
 
     def _create_data_processing_text(
-        self, output_data: OutputData, phonemes: list[ArpaPhoneme], f0_rate: float
-    ) -> str:
-        """データ処理結果の情報テキストを作成"""
-        vowel_voiced_count = output_data.vowel_voiced.sum().item()
-        total_vowels = len(output_data.vowel_voiced)
-        return f"""F0データ shape: {tuple(output_data.f0.shape)}
-Volumeデータ shape: {tuple(output_data.volume.shape)}
-母音F0重心 shape: {tuple(output_data.vowel_f0_means.shape)}
-音素ストレス shape: {tuple(output_data.phoneme_stress.shape)}
-母音有声情報 shape: {tuple(output_data.vowel_voiced.shape)}
-
-音素数: {len(phonemes)}
-母音数: {total_vowels}
-有声母音数: {vowel_voiced_count}
-話者ID: {output_data.speaker_id.item()}
-サンプリングレート: {f0_rate:.2f} Hz"""
-
-    def _create_integrated_f0_plot(
         self,
-        output_data: OutputData,
+        *,
+        frame_rate: float,
+        input_f0_len: int,
+        output_f0_len: int,
+        volume_len: int,
+        silence_len: int,
+        spec_len: int,
+        phoneme_count: int,
+        speaker_id: int,
+    ) -> str:
+        """可視化対象のフレーム系列概要を表示する"""
+        return (
+            f"フレームレート: {frame_rate:.2f} Hz\n"
+            f"フレームF0 shape: ({input_f0_len},)\n"
+            f"母音F0重心 shape: ({output_f0_len},)\n"
+            f"Volume(dB) shape: ({volume_len},)\n"
+            f"Silence shape: ({silence_len},)\n"
+            f"Spec frames: ({spec_len}, ?)\n"
+            f"音素数: {phoneme_count}\n"
+            f"話者ID: {speaker_id}"
+        )
+
+    def _create_f0_phoneme_plot(
+        self,
+        *,
+        frame_rate: float,
+        input_f0: np.ndarray,
+        output_f0: np.ndarray,
+        volume_db: np.ndarray,
         phonemes: list[ArpaPhoneme],
-        f0_rate: float,
         time_start: float,
         time_end: float,
     ) -> Figure:
-        """統合F0プロットを作成"""
-        f0_values = output_data.f0.detach().numpy()
-        volume_values = output_data.volume.detach().numpy()
-        vowel_f0_means = output_data.vowel_f0_means.detach().numpy()
-        stress_values = output_data.phoneme_stress.detach().numpy()
-        vowel_voiced = output_data.vowel_voiced.detach().numpy()
-
+        """フレームF0/母音F0重心/Volume/音素区間の可視化を行う"""
         self.figure_state.main_plot_fig, ax1 = plt.subplots(1, 1, figsize=(24, 6))
 
-        f0_time = np.arange(len(f0_values)) / f0_rate
-        volume_time = np.arange(len(volume_values)) / f0_rate
-        f0_values_display = f0_values.copy()
-        f0_values_display[f0_values == 0] = np.nan
+        t = np.arange(len(input_f0)) / frame_rate
 
-        ax1.plot(f0_time, f0_values_display, "b-", linewidth=3, label="F0")
+        # フレームF0（無声=0はNaNに）
+        f0_in_disp = input_f0.astype(float).copy()
+        f0_in_disp[f0_in_disp == 0] = np.nan
+        ax1.plot(t, f0_in_disp, "b-", linewidth=2.5, label="フレームF0")
         ax1.set_xlabel("時間 (秒)", fontsize=20)
-        ax1.set_ylabel("F0 (Hz)", fontsize=20, color="b")
+        ax1.set_ylabel("対数F0", fontsize=20, color="b")
         ax1.tick_params(axis="y", labelcolor="b")
 
-        ax2 = ax1.twinx()
-        ax2.plot(
-            volume_time,
-            volume_values,
-            "r-",
-            linewidth=2,
-            label="Volume",
-            alpha=0.7,
+        # 母音F0重心
+        out_disp = output_f0.astype(float).copy()
+        out_disp[out_disp == 0] = np.nan
+        ax1.plot(
+            t,
+            out_disp,
+            color="green",
+            linestyle="--",
+            linewidth=2.5,
+            label="母音F0重心",
         )
+
+        # Volume（第2軸）
+        ax2 = ax1.twinx()
+        ax2.plot(t, volume_db, "r-", linewidth=1.8, alpha=0.7, label="Volume(dB)")
         ax2.set_ylabel("Volume (dB)", fontsize=20, color="r")
         ax2.tick_params(axis="y", labelcolor="r")
 
+        # 表示範囲
         ax1.set_xlim(time_start, time_end)
         ax2.set_xlim(time_start, time_end)
 
+        # 音素区間ラベル
         y_min, y_max = ax1.get_ylim()
-
         cmap = plt.cm.tab20  # type: ignore
         max_phoneme_id = len(ArpaPhoneme.phoneme_list)
-
-        for phoneme_idx, phoneme in enumerate(phonemes):
+        for phoneme in phonemes:
             if phoneme.end >= time_start and phoneme.start <= time_end:
                 color = cmap(phoneme.phoneme_id / max_phoneme_id)
-                ax1.axvspan(phoneme.start, phoneme.end, alpha=0.3, color=color)
+                ax1.axvspan(phoneme.start, phoneme.end, alpha=0.18, color=color)
                 mid_time = (phoneme.start + phoneme.end) / 2
                 if time_start <= mid_time <= time_end:
                     ax1.text(
@@ -225,95 +240,122 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
                         phoneme.phoneme,
                         ha="center",
                         va="top",
-                        fontsize=18,
-                        rotation=0,
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.8),
+                        fontsize=15,
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.6),
                     )
 
-                    if ArpaPhoneme.is_vowel(phoneme.phoneme):
-                        stress_value = stress_values[phoneme_idx] - 1  # 1,2,3 -> 0,1,2
-                        if stress_value > 0:
-                            stress_display = "*" * stress_value
-                            ax1.text(
-                                mid_time,
-                                y_max - (y_max - y_min) * 0.05,
-                                stress_display,
-                                ha="center",
-                                va="top",
-                                fontsize=28,
-                                fontweight="bold",
-                                color="black",
-                            )
-
-        vowel_idx = 0
-        for phoneme in phonemes:
-            if ArpaPhoneme.is_vowel(phoneme.phoneme):
-                if phoneme.end >= time_start and phoneme.start <= time_end:
-                    mid_time = (phoneme.start + phoneme.end) / 2
-                    if vowel_idx < len(vowel_f0_means):
-                        is_voiced = vowel_voiced[vowel_idx]
-                        f0_value = vowel_f0_means[vowel_idx]
-
-                        if is_voiced:
-                            color = "red"
-                            marker = "o"
-                            bbox_color = "yellow"
-                            annotation_text = f"{f0_value:.1f}Hz"
-                            display_y = f0_value
-                        else:
-                            color = "gray"
-                            marker = "s"
-                            bbox_color = "lightgray"
-                            annotation_text = "無声"
-                            display_y = 50
-
-                        ax1.scatter(
-                            mid_time,
-                            display_y,
-                            s=200,
-                            c=color,
-                            marker=marker,
-                            edgecolors="black",
-                            linewidth=2,
-                            zorder=10,
-                            label="Vowel F0" if vowel_idx == 0 else "",
-                        )
-
-                        ax1.annotate(
-                            annotation_text,
-                            xy=(float(mid_time), float(display_y)),
-                            xytext=(5, 10),
-                            textcoords="offset points",
-                            fontsize=14,
-                            fontweight="bold",
-                            bbox=dict(
-                                boxstyle="round,pad=0.3",
-                                facecolor=bbox_color,
-                                alpha=0.8,
-                            ),
-                            arrowprops=dict(
-                                arrowstyle="->",
-                                connectionstyle="arc3,rad=0",
-                            ),
-                        )
-                vowel_idx += 1
-
+        # 凡例
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax1.legend(
             lines1 + lines2,
             labels1 + labels2,
-            fontsize=18,
+            fontsize=16,
             loc="lower right",
-            ncol=len(labels1 + labels2),
+            ncol=3,
         )
 
         ax1.grid(True, alpha=0.3)
-        ax1.tick_params(axis="both", which="major", labelsize=18)
-        ax2.tick_params(axis="both", which="major", labelsize=18)
+        ax1.tick_params(axis="both", which="major", labelsize=16)
+        ax2.tick_params(axis="both", which="major", labelsize=16)
 
         plt.tight_layout()
         return self.figure_state.main_plot_fig
+
+    def _create_spectrogram_plot(
+        self,
+        *,
+        frame_rate: float,
+        spec_data: np.ndarray,
+        time_start: float,
+        time_end: float,
+    ) -> Figure:
+        """スペクトログラムを可視化"""
+        fig, ax = plt.subplots(1, 1, figsize=(24, 6))
+
+        # 対数メルスペクトログラム
+        # spec_dataは (time, freq) の形状を想定
+        spec_db = spec_data.T
+
+        # スペクトログラム表示
+        ax.imshow(
+            spec_db,
+            aspect="auto",
+            origin="lower",
+            extent=(0, len(spec_data) / frame_rate, 0, spec_data.shape[1]),
+            cmap="viridis",
+            interpolation="none",
+        )
+
+        ax.set_xlabel("時間 (秒)", fontsize=20)
+        ax.set_ylabel("メル周波数ビン", fontsize=20)
+        ax.set_title("メルスペクトログラム", fontsize=22)
+        ax.set_xlim(time_start, time_end)
+        ax.tick_params(axis="both", which="major", labelsize=16)
+
+        plt.tight_layout()
+        return fig
+
+    def _create_silence_plot(
+        self,
+        *,
+        frame_rate: float,
+        silence_flag: np.ndarray,
+        time_start: float,
+        time_end: float,
+    ) -> Figure:
+        """サイレンス情報を可視化"""
+        fig, ax = plt.subplots(1, 1, figsize=(24, 2))
+
+        # サイレンス背景塗り
+        sil = silence_flag.astype(bool)
+        if np.any(sil):
+            in_region = False
+            start_i = 0
+            silence_regions = []
+
+            # サイレンス区間を収集
+            for i, v in enumerate(sil):
+                if v and not in_region:
+                    in_region = True
+                    start_i = i
+                elif not v and in_region:
+                    in_region = False
+                    silence_regions.append((start_i, i))
+            if in_region:
+                silence_regions.append((start_i, len(sil)))
+
+            # 背景とラベルを描画（グレー色）
+            for idx, (start_i, end_i) in enumerate(silence_regions):
+                start_time = start_i / frame_rate
+                end_time = end_i / frame_rate
+
+                ax.axvspan(
+                    start_time,
+                    end_time,
+                    color="gray",
+                    alpha=0.7,
+                    label="silence" if idx == 0 else None,
+                )
+
+        # 基準線を追加（非サイレンス区間を白で表示）
+        ax.axhspan(0, 1, color="white", alpha=0.3, zorder=0)
+
+        ax.set_xlim(time_start, time_end)
+        ax.set_ylim(0, 1)
+        ax.set_xlabel("時間 (秒)", fontsize=20)
+        ax.set_ylabel("サイレンス", fontsize=20)
+        ax.set_title("サイレンス区間", fontsize=22)
+        ax.set_yticks([])
+        ax.tick_params(axis="both", which="major", labelsize=16)
+        ax.grid(True, alpha=0.3)
+
+        # 凡例
+        if np.any(sil):
+            ax.legend(fontsize=16, loc="upper right")
+
+        plt.tight_layout()
+        return fig
 
     def _create_plots(
         self,
@@ -321,31 +363,82 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
         dataset_type: DatasetType,
         time_start: float = 0,
         time_end: float = 2,
-    ) -> Figure:
+    ) -> tuple[Figure, Figure, Figure]:
         """プロットを作成"""
-        dataset, output_data, lazy_data = self._get_dataset_and_data(
-            index, dataset_type
-        )
+        _, _, lazy_data = self._get_dataset_and_data(index, dataset_type)
 
         input_data = lazy_data.fetch()
         phonemes = input_data.phonemes
-        f0_rate = input_data.f0_data.rate
+        frame_rate = float(input_data.spec_data.rate)
 
-        main_plot = self._create_integrated_f0_plot(
-            output_data, phonemes, f0_rate, time_start, time_end
+        # リサンプリング: スペックのフレームレートに合わせる
+        f0_in = input_data.f0_data.resample(sampling_rate=frame_rate, index=0)
+        volume_db = input_data.volume_data.resample(sampling_rate=frame_rate, index=0)
+        silence = input_data.silence_data.resample(sampling_rate=frame_rate, index=0)
+        spec_len = int(len(input_data.spec_data.array))
+
+        # 長さをスペックに合わせて統一
+        frame_length = min(spec_len, len(f0_in), len(volume_db), len(silence))
+        f0_in = f0_in[:frame_length]
+        volume_db = volume_db[:frame_length]
+        silence = silence[:frame_length]
+
+        # 母音F0重心
+        durations = np.array([p.duration for p in phonemes], dtype=np.float32)
+        vowel_index = np.array(
+            [i for i, p in enumerate(phonemes) if ArpaPhoneme.is_vowel(p.phoneme)]
+        )
+        output_f0 = create_frame_vowel_f0s(
+            f0=f0_in,
+            volume=volume_db,
+            vowel_index=vowel_index,
+            durations=durations,
+            frame_rate=frame_rate,
         )
 
-        return main_plot
+        # 長さを統一
+        frame_length = min(frame_length, len(output_f0))
+        f0_in = f0_in[:frame_length]
+        volume_db = volume_db[:frame_length]
+        silence = silence[:frame_length]
+        output_f0 = output_f0[:frame_length]
+
+        main_plot = self._create_f0_phoneme_plot(
+            frame_rate=frame_rate,
+            input_f0=f0_in,
+            output_f0=output_f0,
+            volume_db=volume_db,
+            phonemes=phonemes,
+            time_start=time_start,
+            time_end=time_end,
+        )
+
+        # スペクトログラムプロット
+        spec_array = input_data.spec_data.array[:frame_length]
+        spectrogram_plot = self._create_spectrogram_plot(
+            frame_rate=frame_rate,
+            spec_data=spec_array,
+            time_start=time_start,
+            time_end=time_end,
+        )
+
+        # サイレンスプロット
+        silence_plot = self._create_silence_plot(
+            frame_rate=frame_rate,
+            silence_flag=silence.astype(bool),
+            time_start=time_start,
+            time_end=time_end,
+        )
+
+        return main_plot, spectrogram_plot, silence_plot
 
     def _get_data_info(self, index: int, dataset_type: DatasetType) -> DataInfo:
         """データ情報を取得"""
-        dataset, output_data, lazy_data = self._get_dataset_and_data(
-            index, dataset_type
-        )
+        _, output_data, lazy_data = self._get_dataset_and_data(index, dataset_type)
 
         input_data = lazy_data.fetch()
         phonemes = input_data.phonemes
-        f0_rate = input_data.f0_data.rate
+        frame_rate = float(input_data.spec_data.rate)
 
         # 音素情報
         phoneme_info_list = []
@@ -368,8 +461,37 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
         speaker_id = f"{output_data.speaker_id.item()}"
 
         file_info = self._get_file_info(index, dataset_type)
+
+        # フレーム系列の長さをスペックのレートに合わせて算出（プロット処理は後段で実装）
+        f0_in = input_data.f0_data.resample(sampling_rate=frame_rate, index=0)
+        volume_db = input_data.volume_data.resample(sampling_rate=frame_rate, index=0)
+        silence = input_data.silence_data.resample(sampling_rate=frame_rate, index=0)
+        spec_len = int(len(input_data.spec_data.array))
+        # 母音F0重心をフレーム系列に展開
+        durations = np.array([p.duration for p in phonemes], dtype=np.float32)
+        vowel_index = np.array(
+            [i for i, p in enumerate(phonemes) if ArpaPhoneme.is_vowel(p.phoneme)]
+        )
+        output_f0 = create_frame_vowel_f0s(
+            f0=f0_in,
+            volume=volume_db,
+            vowel_index=vowel_index,
+            durations=durations,
+            frame_rate=frame_rate,
+        )
+        frame_len = min(
+            spec_len, len(f0_in), len(volume_db), len(silence), len(output_f0)
+        )
+
         data_processing_info = self._create_data_processing_text(
-            output_data, phonemes, f0_rate
+            frame_rate=frame_rate,
+            input_f0_len=frame_len,
+            output_f0_len=frame_len,
+            volume_len=frame_len,
+            silence_len=frame_len,
+            spec_len=spec_len,
+            phoneme_count=len(phonemes),
+            speaker_id=int(output_data.speaker_id.item()),
         )
         details = f"{file_info}\n\n--- データ処理結果 ---\n{data_processing_info}"
 
@@ -426,7 +548,7 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
                 time_end: float,
             ):
                 # プロットとデータ情報を取得
-                main_plot = self._create_plots(
+                main_plot, spectrogram_plot, silence_plot = self._create_plots(
                     index, dataset_type, time_start, time_end
                 )
                 data_info = self._get_data_info(index, dataset_type)
@@ -510,7 +632,22 @@ Volumeデータ shape: {tuple(output_data.volume.shape)}
                         gr.Audio(value=None, label="音声ファイルが見つかりません")
 
                 with gr.Row():
-                    gr.Plot(value=main_plot, label="F0・Volume・音素統合可視化")
+                    gr.Plot(
+                        value=main_plot,
+                        label="フレームF0/母音F0重心/Volume/音素 可視化",
+                    )
+
+                with gr.Row():
+                    gr.Plot(
+                        value=spectrogram_plot,
+                        label="メルスペクトログラム",
+                    )
+
+                with gr.Row():
+                    gr.Plot(
+                        value=silence_plot,
+                        label="サイレンス区間",
+                    )
 
                 with gr.Row():
                     with gr.Column():

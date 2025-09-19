@@ -3,14 +3,20 @@ dataset:
     f0_pathlist_path: "tests/data/test_data/train_f0_pathlist.txt"
     volume_pathlist_path: "tests/data/test_data/train_volume_pathlist.txt"
     lab_pathlist_path: "tests/data/test_data/train_lab_pathlist.txt"
+    silence_pathlist_path: "tests/data/test_data/train_silence_pathlist.txt"
+    spec_pathlist_path: "tests/data/test_data/train_spec_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   valid:
     f0_pathlist_path: "tests/data/test_data/valid_f0_pathlist.txt"
     volume_pathlist_path: "tests/data/test_data/valid_volume_pathlist.txt"
     lab_pathlist_path: "tests/data/test_data/valid_lab_pathlist.txt"
+    silence_pathlist_path: "tests/data/test_data/valid_silence_pathlist.txt"
+    spec_pathlist_path: "tests/data/test_data/valid_spec_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
+  prepost_silence_length: 500
+  max_sampling_length: 100
   test_num: 16
   eval_for_test: true
   eval_times_num: 1
@@ -19,13 +25,16 @@ dataset:
 network:
   phoneme_size: 49
   phoneme_embedding_size: 24
+  f0_embedding_size: 4
   hidden_size: 32
   conformer_block_num: 4
   conformer_dropout_rate: 0.1
   speaker_size: 3
   speaker_embedding_size: 8
-  stress_embedding_size: 4
-  input_phoneme_duration: true
+  output_size: 80
+  postnet_layers: 5
+  postnet_kernel_size: 5
+  postnet_dropout: 0.1
 
 model: {}
 
