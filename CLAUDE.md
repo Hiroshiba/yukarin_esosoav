@@ -116,9 +116,8 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 2. **カスタム損失関数**: `model.py`の拡張
 3. **異なるデータ形式**: データローダーの拡張
 
-### 参考プロジェクト
-- 以下のプロジェクトの実装パターンを参考にしている
-- `../yukarin_sosoa`、`../yukarin_sosfd`、`../accent_estimator`
+**フォーク前からある汎用関数の関数名やdocstringは変更してはいけない。**
+追従するときにコンフリクトしてしまうから。
 
 ---
 
