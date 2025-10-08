@@ -406,6 +406,7 @@ def training_loop(context: TrainingContext) -> None:
         if should_log_epoch(context):
             summary = {
                 "iteration": context.iteration,
+                "epoch": context.epoch,
                 "lr": context.optimizer.param_groups[0]["lr"],
             }
             summary.update(training_results.to_summary_dict())
