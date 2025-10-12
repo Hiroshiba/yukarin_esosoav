@@ -32,6 +32,7 @@ class DatasetConfig(_Model):
     valid: DataFileConfig | None = None
     prepost_silence_length: int
     max_sampling_length: int
+    train_num: int | None = None
     test_num: int
     eval_for_test: bool
     eval_times_num: int = 1
@@ -65,6 +66,7 @@ class TrainConfig(_Model):
     """学習の設定"""
 
     batch_size: int
+    gradient_accumulation: int = 1
     eval_batch_size: int
     log_epoch: int
     eval_epoch: int

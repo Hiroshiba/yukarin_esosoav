@@ -226,6 +226,8 @@ def create_dataset(config: DatasetConfig) -> DatasetCollection:
         random.Random(config.seed).shuffle(datas)
 
     tests, trains = datas[: config.test_num], datas[config.test_num :]
+    if config.train_num is not None:
+        trains = trains[: config.train_num]
 
     def _wrapper(datas: list[LazyInputData], is_eval: bool) -> Dataset:
         if is_eval:
