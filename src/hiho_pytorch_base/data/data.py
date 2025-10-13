@@ -33,7 +33,7 @@ class OutputData:
     f0: Tensor  # (fL,)
     phoneme: Tensor  # (fL,)
     spec: Tensor  # (fL, ?) NOTE: 対数メルスペクトログラム
-    framed_wave: Tensor  # (wL, ?)
+    framed_wave: Tensor  # (wfL, ?)
     wave_start_frame: Tensor
     speaker_id: Tensor
 

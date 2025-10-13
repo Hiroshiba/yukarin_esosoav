@@ -61,8 +61,7 @@ class AcousticNetworkConfig(_Model):
 class VocoderNetworkConfig(_Model):
     """ボコーダーネットワークの設定"""
 
-    sampling_rate: int
-    frame_rate: int
+    frame_size: int
     upsample_rates: list[int]
     upsample_kernel_sizes: list[int]
     upsample_initial_channel: int
