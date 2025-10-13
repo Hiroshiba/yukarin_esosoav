@@ -20,11 +20,13 @@ class Predictor(nn.Module):
         acoustic_predictor: AcousticPredictor,
         vocoder: Vocoder,
         frame_size: int,
+        sampling_rate: int,
     ):
         super().__init__()
         self.acoustic_predictor = acoustic_predictor
         self.vocoder = vocoder
         self.frame_size = frame_size
+        self.sampling_rate = sampling_rate
 
     def forward(  # noqa: D102
         self,
@@ -104,5 +106,6 @@ def create_predictor(config: NetworkConfig) -> Predictor:
     return Predictor(
         acoustic_predictor=acoustic_predictor,
         vocoder=vocoder,
-        frame_size=config.vocoder.frame_size,
+        frame_size=config.frame_size,
+        sampling_rate=config.sampling_rate,
     )
