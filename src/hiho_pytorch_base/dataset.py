@@ -30,6 +30,7 @@ class LazyInputData:
     lab_path: UPath
     silence_path: UPath
     spec_path: UPath  # NOTE: 対数メルスペクトログラム
+    wave_path: UPath
     speaker_id: int
 
     def fetch(self) -> InputData:
@@ -40,6 +41,7 @@ class LazyInputData:
             volume_data=SamplingData.load(to_local_path(self.volume_path)),
             silence_data=SamplingData.load(to_local_path(self.silence_path)),
             spec_data=SamplingData.load(to_local_path(self.spec_path)),
+            wave_data=SamplingData.load(to_local_path(self.wave_path)),
             speaker_id=self.speaker_id,
         )
 
@@ -77,8 +79,9 @@ class Dataset(BaseDataset[OutputData]):
         try:
             return preprocess(
                 self.datas[i].fetch(),
-                prepost_silence_length=self.config.prepost_silence_length,
-                max_sampling_length=self.config.max_sampling_length,
+                prepost_silence_frame_length=self.config.prepost_silence_frame_length,
+                max_frame_length=self.config.max_frame_length,
+                max_wave_frame_length=self.config.max_wave_frame_length,
                 is_eval=self.is_eval,
             )
         except Exception as e:
@@ -182,6 +185,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             lab_pathmappings,
             silence_pathmappings,
             spec_pathmappings,
+            wave_pathmappings,
         ),
     ) = get_data_paths(
         config.root_dir,
@@ -191,6 +195,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             config.lab_pathlist_path,
             config.silence_pathlist_path,
             config.spec_pathlist_path,
+            config.wave_pathlist_path,
         ],
     )
 
@@ -210,6 +215,7 @@ def get_datas(config: DataFileConfig) -> list[LazyInputData]:
             lab_path=lab_pathmappings[fn],
             silence_path=silence_pathmappings[fn],
             spec_path=spec_pathmappings[fn],
+            wave_path=wave_pathmappings[fn],
             speaker_id=speaker_ids[fn],
         )
         for fn in fn_list

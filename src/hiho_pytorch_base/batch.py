@@ -16,9 +16,10 @@ from hiho_pytorch_base.utility.pytorch_utility import to_device
 class BatchOutput:
     """バッチ処理後のデータ構造"""
 
-    f0_list: list[Tensor]  # [(L,)]
-    phoneme_list: list[Tensor]  # [(L,)]
-    spec_list: list[Tensor]  # [(L, ?)]
+    f0_list: list[Tensor]  # [(fL,)]
+    phoneme_list: list[Tensor]  # [(fL,)]
+    spec_list: list[Tensor]  # [(fL, ?)]
+    wave_list: list[Tensor]  # [(wL,)]
     speaker_id: Tensor  # (B,)
 
     @property
@@ -33,6 +34,7 @@ class BatchOutput:
             self.phoneme_list, device, non_blocking=non_blocking
         )
         self.spec_list = to_device(self.spec_list, device, non_blocking=non_blocking)
+        self.wave_list = to_device(self.wave_list, device, non_blocking=non_blocking)
         self.speaker_id = to_device(self.speaker_id, device, non_blocking=non_blocking)
         return self
 
@@ -51,5 +53,6 @@ def collate_dataset_output(data_list: list[OutputData]) -> BatchOutput:
         f0_list=[d.f0 for d in data_list],
         phoneme_list=[d.phoneme for d in data_list],
         spec_list=[d.spec for d in data_list],
+        wave_list=[d.wave for d in data_list],
         speaker_id=collate_stack([d.speaker_id for d in data_list]),
     )

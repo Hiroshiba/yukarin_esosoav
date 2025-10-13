@@ -21,6 +21,7 @@ class DataFileConfig(_Model):
     lab_pathlist_path: UPathField
     silence_pathlist_path: UPathField
     spec_pathlist_path: UPathField
+    wave_pathlist_path: UPathField
     speaker_dict_path: UPathField
     root_dir: UPathField | None
 
@@ -30,8 +31,9 @@ class DatasetConfig(_Model):
 
     train: DataFileConfig
     valid: DataFileConfig | None = None
-    prepost_silence_length: int
-    max_sampling_length: int
+    prepost_silence_frame_length: int
+    max_frame_length: int
+    max_wave_frame_length: int
     train_num: int | None = None
     test_num: int
     eval_for_test: bool
@@ -39,8 +41,8 @@ class DatasetConfig(_Model):
     seed: int = 0
 
 
-class NetworkConfig(_Model):
-    """ニューラルネットワークの設定"""
+class AcousticNetworkConfig(_Model):
+    """音響特徴量予測ネットワークの設定"""
 
     phoneme_size: int
     phoneme_embedding_size: int
@@ -56,10 +58,32 @@ class NetworkConfig(_Model):
     postnet_dropout: float
 
 
+class VocoderNetworkConfig(_Model):
+    """ボコーダーネットワークの設定"""
+
+    sampling_rate: int
+    frame_rate: int
+    upsample_rates: list[int]
+    upsample_kernel_sizes: list[int]
+    upsample_initial_channel: int
+    resblock: str
+    resblock_kernel_sizes: list[int]
+    resblock_dilation_sizes: list[list[int]]
+
+
+class NetworkConfig(_Model):
+    """ニューラルネットワーク全体の設定"""
+
+    acoustic: AcousticNetworkConfig
+    vocoder: VocoderNetworkConfig
+
+
 class ModelConfig(_Model):
     """モデルの設定"""
 
-    pass
+    acoustic_loss1_weight: float
+    acoustic_loss2_weight: float
+    vocoder_spec_loss_weight: float
 
 
 class TrainConfig(_Model):

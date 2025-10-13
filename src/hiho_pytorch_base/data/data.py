@@ -22,6 +22,7 @@ class InputData:
     volume_data: SamplingData
     silence_data: SamplingData
     spec_data: SamplingData  # NOTE: 対数メルスペクトログラム
+    wave_data: SamplingData
     speaker_id: int
 
 
@@ -29,9 +30,11 @@ class InputData:
 class OutputData:
     """データ処理後のデータ構造"""
 
-    f0: Tensor  # (L,)
-    phoneme: Tensor  # (L,)
-    spec: Tensor  # (L, ?) NOTE: 対数メルスペクトログラム
+    f0: Tensor  # (fL,)
+    phoneme: Tensor  # (fL,)
+    spec: Tensor  # (fL, ?) NOTE: 対数メルスペクトログラム
+    framed_wave: Tensor  # (wL, ?)
+    wave_start_frame: Tensor
     speaker_id: Tensor
 
 
@@ -125,13 +128,21 @@ def create_frame_phoneme_ids(
 
 def preprocess(
     d: InputData,
-    prepost_silence_length: int,
-    max_sampling_length: int,
+    prepost_silence_frame_length: int,
+    max_frame_length: int,
+    max_wave_frame_length: int,
     is_eval: bool,
 ) -> OutputData:
     """全ての変換・検証・配列化処理を統合"""
-    # リサンプリング
+    rng = numpy.random.default_rng()
+
     frame_rate = float(d.spec_data.rate)
+    wave_rate = float(d.wave_data.rate)
+    if wave_rate % frame_rate != 0:
+        raise ValueError(
+            f"wave_rate ({wave_rate}) はframe_rate ({frame_rate}) の整数倍である必要があります"
+        )
+
     f0 = d.f0_data.resample(
         sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
     )
@@ -142,6 +153,14 @@ def preprocess(
         sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
     )
     spec = d.spec_data.array
+    wave = d.wave_data.array
+
+    # 波形をフレーム化
+    frame_size = int(wave_rate / frame_rate)
+    trimmed_wave_length = (len(wave) // frame_size) * frame_size
+    wave = wave[:trimmed_wave_length]
+    framed_wave = wave.reshape(-1, frame_size)
+    del wave
 
     phoneme_id = create_frame_phoneme_ids(d.phonemes, frame_rate=frame_rate)
 
@@ -161,13 +180,15 @@ def preprocess(
         durations=phoneme_durations,
         frame_rate=frame_rate,
     )
+    del volume
 
     # 長さと一貫性の検証（許容誤差は3フレーム）
     len_spec = int(len(spec))
     len_f0 = int(len(f0))
-    len_vol = int(len(volume))
     len_lab = int(len(phoneme_id))
     len_sil = int(len(silence))
+    len_wave_frames = int(len(framed_wave))
+    frame_length = min(len_spec, len_f0, len_lab, len_sil, len_wave_frames)
 
     def _check_pair(a: int, b: int, what: str) -> None:
         if abs(a - b) > 3:
@@ -175,45 +196,74 @@ def preprocess(
                 f"{what} の長さが一致しません: {a} vs {b} (許容:3フレーム)"
             )
 
-    _check_pair(len_spec, len_f0, "spec と f0")
-    _check_pair(len_spec, len_vol, "spec と volume")
-    _check_pair(len_spec, len_lab, "spec と LAB 由来フレーム数")
-    _check_pair(len_spec, len_sil, "spec と silence")
+    _check_pair(len_spec, frame_length, "spec")
+    _check_pair(len_f0, frame_length, "f0")
+    _check_pair(len_lab, frame_length, "LAB 由来フレーム数")
+    _check_pair(len_sil, frame_length, "silence")
+    _check_pair(len_wave_frames, frame_length, "wave 由来フレーム数")
 
-    # 長さを統一
-    frame_length = min(len_spec, len_f0, len_vol, len_lab, len_sil)
+    # 長さを最小のものに統一
     spec = spec[:frame_length]
     f0 = f0[:frame_length]
-    volume = volume[:frame_length]
     silence = silence[:frame_length]
     phoneme_id = phoneme_id[:frame_length]
+    framed_wave = framed_wave[:frame_length]
 
     # 最初と最後の無音を除去
     notsilence_range = get_notsilence_range(
-        silence=silence, prepost_silence_length=prepost_silence_length
+        silence=silence, prepost_silence_length=prepost_silence_frame_length
     )
+    del silence
+
+    spec = spec[notsilence_range]
     f0 = f0[notsilence_range]
     phoneme_id = phoneme_id[notsilence_range]
-    spec = spec[notsilence_range]
+    framed_wave = framed_wave[notsilence_range]
 
-    # 最大サンプリング長
-    length = len(f0)
-    if length > max_sampling_length:
-        if is_eval:
-            offset = 0
-        else:
-            offset = numpy.random.default_rng().integers(
-                length - max_sampling_length + 1
-            )
-        s = slice(offset, offset + max_sampling_length)
-        f0 = f0[s]
-        phoneme_id = phoneme_id[s]
-        spec = spec[s]
+    trimmed_length = len(spec)
+    if trimmed_length <= 0:
+        raise ValueError("無音区間を除去した結果、フレーム長が0になりました")
 
-    # Tensor変換
+    # フレーム範囲
+    # NOTE: 評価時は全体を使い、学習時は最大長を超えたときだけ合わせる
+    if is_eval:
+        slice_length = trimmed_length
+        slice_offset = 0
+    elif trimmed_length > max_frame_length:
+        slice_length = max_frame_length
+        slice_offset = rng.integers(trimmed_length - slice_length + 1)
+    else:
+        slice_length = trimmed_length
+        slice_offset = 0
+
+    frame_start = slice_offset
+    frame_stop = frame_start + slice_length
+    frame_slice = slice(frame_start, frame_stop)
+
+    f0 = f0[frame_slice]
+    phoneme_id = phoneme_id[frame_slice]
+    spec = spec[frame_slice]
+    framed_wave = framed_wave[frame_slice]
+
+    # 波形の切り出し
+    # NOTE: 評価時は全体を使い、学習時は固定長にする
+    if is_eval:
+        wave_start_frame = 0
+        wave_frame_length = slice_length
+    elif slice_length >= max_wave_frame_length:
+        wave_start_frame = rng.integers(slice_length - max_wave_frame_length + 1)
+        wave_frame_length = max_wave_frame_length
+    else:
+        wave_start_frame = 0
+        wave_frame_length = slice_length
+
+    framed_wave = framed_wave[wave_start_frame : wave_start_frame + wave_frame_length]
+
     return OutputData(
         f0=torch.from_numpy(f0).float(),
         phoneme=torch.from_numpy(phoneme_id).long(),
         spec=torch.from_numpy(spec).float(),
+        framed_wave=torch.from_numpy(framed_wave).float(),
+        wave_start_frame=torch.tensor(wave_start_frame).long(),
         speaker_id=torch.tensor(d.speaker_id).long(),
     )

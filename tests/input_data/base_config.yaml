@@ -37,7 +37,10 @@ network:
   postnet_kernel_size: 5
   postnet_dropout: 0.1
 
-model: {}
+model:
+  predictor_loss1_weight: 1.0
+  predictor_loss2_weight: 1.0
+  vocoder_spec_loss_weight: 45.0
 
 train:
   batch_size: 4
