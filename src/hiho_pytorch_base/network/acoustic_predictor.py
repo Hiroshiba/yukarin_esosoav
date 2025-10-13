@@ -2,6 +2,7 @@
 
 import torch
 from torch import Tensor, nn
+from torch.nn.utils.rnn import pad_sequence
 
 from hiho_pytorch_base.config import AcousticNetworkConfig
 from hiho_pytorch_base.network.conformer.encoder import Encoder
@@ -160,6 +161,36 @@ class AcousticPredictor(nn.Module):
         y2 = y1 + self.postnet(y1.transpose(1, 2)).transpose(1, 2)  # (B, fL, ?)
 
         return y1, y2
+
+    def forward_list(  # noqa: D102
+        self,
+        *,
+        f0_list: list[Tensor],  # [(fL,)]
+        phoneme_list: list[Tensor],  # [(fL,)]
+        speaker_id: Tensor,  # (B,)
+    ) -> tuple[
+        list[Tensor],  # [(fL, ?)]
+        list[Tensor],  # [(fL, ?)]
+    ]:
+        device = f0_list[0].device
+        length = torch.tensor([seq.size(0) for seq in f0_list], device=device)
+
+        f0 = pad_sequence(f0_list, batch_first=True)
+        phoneme = pad_sequence(phoneme_list, batch_first=True)
+
+        speaker_id = speaker_id.to(device)
+
+        spec1, spec2 = self.forward(
+            f0=f0,
+            phoneme=phoneme,
+            length=length.long(),
+            speaker_id=speaker_id,
+        )
+
+        return (
+            [spec1[i, :seq_len] for i, seq_len in enumerate(length.tolist())],
+            [spec2[i, :seq_len] for i, seq_len in enumerate(length.tolist())],
+        )
 
 
 def create_acoustic_predictor(config: AcousticNetworkConfig) -> AcousticPredictor:

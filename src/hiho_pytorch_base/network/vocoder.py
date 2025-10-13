@@ -1,12 +1,12 @@
 """ボコーダーネットワークモジュール"""
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Conv1d, ConvTranspose1d
 from torch.nn.utils import remove_weight_norm, weight_norm
-
-from hiho_pytorch_base.config import VocoderNetworkConfig
+from torch.nn.utils.rnn import pad_sequence
 
 LRELU_SLOPE = 0.1
 
@@ -217,6 +217,8 @@ class Vocoder(nn.Module):
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
+        self.upsample_factor = int(np.prod(upsample_rates))
+
     def forward(  # noqa: D102
         self,
         x: Tensor,  # (B, ?, fL)
@@ -237,6 +239,21 @@ class Vocoder(nn.Module):
         x = torch.tanh(x)
 
         return x
+
+    def forward_list(  # noqa: D102
+        self,
+        spec_list: list[Tensor],  # [(fL, ?)]
+    ) -> list[Tensor]:  # [(wL,)]
+        device = spec_list[0].device
+
+        frame_length = torch.tensor([seq.size(0) for seq in spec_list], device=device)
+
+        padded = pad_sequence(spec_list, batch_first=True)  # (B, fL, ?)
+        padded = padded.transpose(1, 2).contiguous()  # (B, ?, fL)
+
+        wave = self.forward(padded).squeeze(1)  # (B, wL)
+
+        return [wave[i, : l * self.upsample_factor] for i, l in enumerate(frame_length)]
 
     def remove_weight_norm(self) -> None:
         """weight normを削除"""

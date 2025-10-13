@@ -1,8 +1,6 @@
 """メインのネットワークモジュール"""
 
-import torch
 from torch import Tensor, nn
-from torch.nn.utils.rnn import pad_sequence
 
 from hiho_pytorch_base.config import NetworkConfig
 from hiho_pytorch_base.network.acoustic_predictor import (
@@ -39,28 +37,14 @@ class Predictor(nn.Module):
         list[Tensor],  # [(fL, ?)]
         list[Tensor],  # [(wL,)]
     ]:
-        device = f0_list[0].device
-
-        length = torch.tensor([f0.shape[0] for f0 in f0_list], device=device)
-
-        f0 = pad_sequence(f0_list, batch_first=True)
-        phoneme = pad_sequence(phoneme_list, batch_first=True)
-
-        spec1, spec2 = self.acoustic_predictor(
-            f0=f0,
-            phoneme=phoneme,
-            length=length,
+        spec1_list, spec2_list = self.acoustic_predictor.forward_list(
+            f0_list=f0_list,
+            phoneme_list=phoneme_list,
             speaker_id=speaker_id,
         )
+        wave_list = self.vocoder.forward_list(spec2_list)
 
-        h_spec = spec2.transpose(1, 2).contiguous()  # (B, ?, fL)
-        wave = self.vocoder(h_spec).squeeze(1)  # (B, ?)
-
-        return (
-            [spec1[i, :l] for i, l in enumerate(length)],
-            [spec2[i, :l] for i, l in enumerate(length)],
-            [wave[i, : (l * self.frame_size)] for i, l in enumerate(length)],
-        )
+        return spec1_list, spec2_list, wave_list
 
 
 def create_predictor(config: NetworkConfig) -> Predictor:

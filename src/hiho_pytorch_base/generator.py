@@ -23,7 +23,7 @@ class GeneratorOutput:
 
 def to_tensor(array: TensorLike, device: torch.device) -> Tensor:
     """データをTensorに変換する"""
-    if not isinstance(array, (Tensor, numpy.ndarray)):
+    if not isinstance(array, Tensor | numpy.ndarray):
         array = numpy.asarray(array)
     if isinstance(array, numpy.ndarray):
         tensor = torch.from_numpy(array)
@@ -58,8 +58,8 @@ class Generator(nn.Module):
     def forward(
         self,
         *,
-        f0_list: list[TensorLike],  # [(L,)]
-        phoneme_list: list[TensorLike],  # [(L,)]
+        f0_list: list[TensorLike],  # [(fL,)]
+        phoneme_list: list[TensorLike],  # [(fL,)]
         speaker_id: TensorLike,  # (B,)
     ) -> list[GeneratorOutput]:
         """生成経路で推論する"""
@@ -67,7 +67,7 @@ class Generator(nn.Module):
         phoneme_list_t = [to_tensor(x, self.device) for x in phoneme_list]
         speaker_id_t = to_tensor(speaker_id, self.device)
 
-        _, post_list, wave_list = self.predictor(
+        _, spec_list, wave_list = self.predictor(
             f0_list=f0_list_t,
             phoneme_list=phoneme_list_t,
             speaker_id=speaker_id_t,
@@ -75,5 +75,5 @@ class Generator(nn.Module):
 
         return [
             GeneratorOutput(spec=spec, wave=wave)
-            for spec, wave in zip(post_list, wave_list, strict=True)
+            for spec, wave in zip(spec_list, wave_list, strict=True)
         ]
