@@ -51,7 +51,7 @@ network:
     mpd_initial_channel: 8
     msd_initial_channel: 32
   frame_size: 256
-  sampling_rate: 24000
+  sampling_rate: 8000
 
 model:
   # FIXME: あとでhifi-ganの実装と合わせる

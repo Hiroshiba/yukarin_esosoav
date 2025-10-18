@@ -54,7 +54,7 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
     rng = np.random.default_rng(42)
     durations = {stem: rng.uniform(0.25, 1.0) for stem in all_stems}
     f0_rate = 200.0
-    spec_rate = 24000 / 256
+    spec_rate = config.network.sampling_rate / config.network.frame_size
 
     # F0データ
     def generate_f0(file_path: Path) -> None:
