@@ -257,8 +257,20 @@ def preprocess(
     else:
         wave_start_frame = 0
         pad_length = wave_frame_length - slice_length
-        padding = numpy.zeros((pad_length, framed_wave.shape[1]), like=framed_wave)
-        framed_wave = numpy.concatenate([framed_wave, padding], axis=0)
+
+        spec_padding = numpy.zeros((pad_length, spec.shape[1]), dtype=spec.dtype)
+        spec = numpy.concatenate([spec, spec_padding], axis=0)
+
+        f0_padding = numpy.zeros(pad_length, dtype=f0.dtype)
+        f0 = numpy.concatenate([f0, f0_padding], axis=0)
+
+        phoneme_padding = numpy.zeros(pad_length, dtype=phoneme_id.dtype)
+        phoneme_id = numpy.concatenate([phoneme_id, phoneme_padding], axis=0)
+
+        wave_padding = numpy.zeros(
+            (pad_length, framed_wave.shape[1]), dtype=framed_wave.dtype
+        )
+        framed_wave = numpy.concatenate([framed_wave, wave_padding], axis=0)
 
     return OutputData(
         f0=torch.from_numpy(f0).float(),

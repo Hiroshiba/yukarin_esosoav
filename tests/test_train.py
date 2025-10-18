@@ -50,8 +50,12 @@ def test_dataset_creation(train_config: Config) -> None:
 def test_model_creation(train_config: Config) -> None:
     """モデルの作成テスト"""
     predictor = create_predictor(train_config.network)
-    mpd = MultiPeriodDiscriminator()
-    msd = MultiScaleDiscriminator()
+    mpd = MultiPeriodDiscriminator(
+        initial_channel=train_config.network.discriminator.mpd_initial_channel
+    )
+    msd = MultiScaleDiscriminator(
+        initial_channel=train_config.network.discriminator.msd_initial_channel
+    )
     model = Model(
         model_config=train_config.model, predictor=predictor, mpd=mpd, msd=msd
     )

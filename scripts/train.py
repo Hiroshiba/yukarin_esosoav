@@ -227,9 +227,14 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     print("predictor:", predictor)
 
     # model
-    predictor_scripted: Predictor = torch.compile(predictor)  # type: ignore
-    mpd = MultiPeriodDiscriminator()
-    msd = MultiScaleDiscriminator()
+    # predictor_scripted: Predictor = torch.compile(predictor)  # type: ignore
+    predictor_scripted = predictor  # FIXME: コンパイルは一旦保留
+    mpd = MultiPeriodDiscriminator(
+        initial_channel=config.network.discriminator.mpd_initial_channel
+    )
+    msd = MultiScaleDiscriminator(
+        initial_channel=config.network.discriminator.msd_initial_channel
+    )
     model = Model(
         model_config=config.model,
         predictor=predictor_scripted,

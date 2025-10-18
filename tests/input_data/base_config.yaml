@@ -18,8 +18,8 @@ dataset:
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   prepost_silence_frame_length: 5
-  max_frame_length: 100
-  max_wave_frame_length: 50
+  max_frame_length: 50
+  wave_frame_length: 5
   train_num: null
   test_num: 10
   eval_for_test: true
@@ -41,12 +41,15 @@ network:
     postnet_kernel_size: 5
     postnet_dropout: 0.1
   vocoder:
-    upsample_rates: [8, 8, 2, 2]
-    upsample_kernel_sizes: [16, 16, 4, 4]
-    upsample_initial_channel: 128
+    upsample_rates: [16, 16]
+    upsample_kernel_sizes: [32, 32]
+    upsample_initial_channel: 8
     resblock: "1"
-    resblock_kernel_sizes: [3, 7, 11]
-    resblock_dilation_sizes: [[1, 3, 5], [1, 3, 5], [1, 3, 5]]
+    resblock_kernel_sizes: [3]
+    resblock_dilation_sizes: [[1, 3, 5]]
+  discriminator:
+    mpd_initial_channel: 8
+    msd_initial_channel: 32
   frame_size: 256
   sampling_rate: 24000
 

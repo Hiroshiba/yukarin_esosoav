@@ -16,6 +16,7 @@ class DiscriminatorP(nn.Module):
     def __init__(
         self,
         period: int,
+        initial_channel: int,
         kernel_size: int = 5,
         stride: int = 3,
         use_spectral_norm: bool = False,
@@ -23,12 +24,19 @@ class DiscriminatorP(nn.Module):
         super().__init__()
         self.period = period
         norm_f = weight_norm if use_spectral_norm is False else spectral_norm
+        channels = [
+            initial_channel,
+            initial_channel * 4,
+            initial_channel * 16,
+            initial_channel * 32,
+            initial_channel * 32,
+        ]
         self.convs = nn.ModuleList(
             [
                 norm_f(
                     Conv2d(
                         1,
-                        32,
+                        channels[0],
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(5, 1), 0),
@@ -36,8 +44,8 @@ class DiscriminatorP(nn.Module):
                 ),
                 norm_f(
                     Conv2d(
-                        32,
-                        128,
+                        channels[0],
+                        channels[1],
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(5, 1), 0),
@@ -45,8 +53,8 @@ class DiscriminatorP(nn.Module):
                 ),
                 norm_f(
                     Conv2d(
-                        128,
-                        512,
+                        channels[1],
+                        channels[2],
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(5, 1), 0),
@@ -54,17 +62,19 @@ class DiscriminatorP(nn.Module):
                 ),
                 norm_f(
                     Conv2d(
-                        512,
-                        1024,
+                        channels[2],
+                        channels[3],
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(5, 1), 0),
                     )
                 ),
-                norm_f(Conv2d(1024, 1024, (kernel_size, 1), 1, padding=(2, 0))),
+                norm_f(
+                    Conv2d(channels[3], channels[4], (kernel_size, 1), 1, padding=(2, 0))
+                ),
             ]
         )
-        self.conv_post = norm_f(Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
+        self.conv_post = norm_f(Conv2d(channels[4], 1, (3, 1), 1, padding=(1, 0)))
 
     def forward(self, x: Tensor) -> tuple[Tensor, list[Tensor]]:  # noqa: D102
         fmap = []
@@ -91,15 +101,15 @@ class DiscriminatorP(nn.Module):
 class MultiPeriodDiscriminator(nn.Module):
     """複数のPeriod-based Discriminatorを組み合わせたもの"""
 
-    def __init__(self):
+    def __init__(self, initial_channel: int):
         super().__init__()
         self.discriminators = nn.ModuleList(
             [
-                DiscriminatorP(2),
-                DiscriminatorP(3),
-                DiscriminatorP(5),
-                DiscriminatorP(7),
-                DiscriminatorP(11),
+                DiscriminatorP(period=2, initial_channel=initial_channel),
+                DiscriminatorP(period=3, initial_channel=initial_channel),
+                DiscriminatorP(period=5, initial_channel=initial_channel),
+                DiscriminatorP(period=7, initial_channel=initial_channel),
+                DiscriminatorP(period=11, initial_channel=initial_channel),
             ]
         )
 
@@ -126,21 +136,34 @@ class MultiPeriodDiscriminator(nn.Module):
 class DiscriminatorS(nn.Module):
     """Scale-based Discriminator"""
 
-    def __init__(self, use_spectral_norm: bool = False):
+    def __init__(
+        self,
+        initial_channel: int,
+        use_spectral_norm: bool = False,
+    ):
         super().__init__()
         norm_f = weight_norm if use_spectral_norm is False else spectral_norm
+        channels = [
+            initial_channel,
+            initial_channel,
+            initial_channel * 2,
+            initial_channel * 4,
+            initial_channel * 8,
+            initial_channel * 8,
+            initial_channel * 8,
+        ]
         self.convs = nn.ModuleList(
             [
-                norm_f(Conv1d(1, 128, 15, 1, padding=7)),
-                norm_f(Conv1d(128, 128, 41, 2, groups=4, padding=20)),
-                norm_f(Conv1d(128, 256, 41, 2, groups=16, padding=20)),
-                norm_f(Conv1d(256, 512, 41, 4, groups=16, padding=20)),
-                norm_f(Conv1d(512, 1024, 41, 4, groups=16, padding=20)),
-                norm_f(Conv1d(1024, 1024, 41, 1, groups=16, padding=20)),
-                norm_f(Conv1d(1024, 1024, 5, 1, padding=2)),
+                norm_f(Conv1d(1, channels[0], 15, 1, padding=7)),
+                norm_f(Conv1d(channels[0], channels[1], 41, 2, groups=4, padding=20)),
+                norm_f(Conv1d(channels[1], channels[2], 41, 2, groups=16, padding=20)),
+                norm_f(Conv1d(channels[2], channels[3], 41, 4, groups=16, padding=20)),
+                norm_f(Conv1d(channels[3], channels[4], 41, 4, groups=16, padding=20)),
+                norm_f(Conv1d(channels[4], channels[5], 41, 1, groups=16, padding=20)),
+                norm_f(Conv1d(channels[5], channels[6], 5, 1, padding=2)),
             ]
         )
-        self.conv_post = norm_f(Conv1d(1024, 1, 3, 1, padding=1))
+        self.conv_post = norm_f(Conv1d(channels[6], 1, 3, 1, padding=1))
 
     def forward(  # noqa: D102
         self,
@@ -161,13 +184,15 @@ class DiscriminatorS(nn.Module):
 class MultiScaleDiscriminator(nn.Module):
     """複数のScale-based Discriminatorを組み合わせたもの"""
 
-    def __init__(self):
+    def __init__(self, initial_channel: int):
         super().__init__()
         self.discriminators = nn.ModuleList(
             [
-                DiscriminatorS(use_spectral_norm=True),
-                DiscriminatorS(),
-                DiscriminatorS(),
+                DiscriminatorS(
+                    initial_channel=initial_channel, use_spectral_norm=True
+                ),
+                DiscriminatorS(initial_channel=initial_channel),
+                DiscriminatorS(initial_channel=initial_channel),
             ]
         )
         self.meanpools = nn.ModuleList(

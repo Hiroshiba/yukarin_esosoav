@@ -69,11 +69,19 @@ class VocoderNetworkConfig(_Model):
     resblock_dilation_sizes: list[list[int]]
 
 
+class DiscriminatorNetworkConfig(_Model):
+    """判別器ネットワークの設定"""
+
+    mpd_initial_channel: int
+    msd_initial_channel: int
+
+
 class NetworkConfig(_Model):
     """ニューラルネットワーク全体の設定"""
 
     acoustic: AcousticNetworkConfig
     vocoder: VocoderNetworkConfig
+    discriminator: DiscriminatorNetworkConfig
     frame_size: int
     sampling_rate: int
 
