@@ -33,7 +33,7 @@ class DatasetConfig(_Model):
     valid: DataFileConfig | None = None
     prepost_silence_frame_length: int
     max_frame_length: int
-    max_wave_frame_length: int
+    wave_frame_length: int
     train_num: int | None = None
     test_num: int
     eval_for_test: bool

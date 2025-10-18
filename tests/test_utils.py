@@ -106,7 +106,9 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
         # 音素の時間情報を生成
         current_time = 0.0
         lab_lines = []
-        for phoneme, duration in zip(selected_phonemes, phoneme_durations, strict=False):
+        for phoneme, duration in zip(
+            selected_phonemes, phoneme_durations, strict=False
+        ):
             end_time = current_time + duration
             lab_lines.append(f"{current_time:.4f}\t{end_time:.4f}\t{phoneme}")
             current_time = end_time
@@ -120,9 +122,7 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
         stem = file_path.stem
         silence_length = int(durations[stem] * f0_rate)
         silence_data = rng.random(silence_length) < 0.2
-        sampling_data = SamplingData(
-            array=silence_data[:, np.newaxis], rate=f0_rate
-        )
+        sampling_data = SamplingData(array=silence_data[:, np.newaxis], rate=f0_rate)
         sampling_data.save(file_path)
 
     _setup_data(generate_silence, "silence", "npy")

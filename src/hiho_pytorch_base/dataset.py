@@ -81,7 +81,7 @@ class Dataset(BaseDataset[OutputData]):
                 self.datas[i].fetch(),
                 prepost_silence_frame_length=self.config.prepost_silence_frame_length,
                 max_frame_length=self.config.max_frame_length,
-                max_wave_frame_length=self.config.max_wave_frame_length,
+                wave_frame_length=self.config.wave_frame_length,
                 is_eval=self.is_eval,
             )
         except Exception as e:

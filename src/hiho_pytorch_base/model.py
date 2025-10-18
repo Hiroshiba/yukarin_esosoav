@@ -33,10 +33,6 @@ def _slice_specs_for_wave(
     ]
 
 
-def _flatten_wave_frames(framed_wave_list: list[Tensor]) -> list[Tensor]:
-    return [frames.reshape(-1) for frames in framed_wave_list]
-
-
 def _log_mel_list(
     wave_list: list[Tensor],
     *,
@@ -227,13 +223,12 @@ class Model(nn.Module):
         wave_spec_loss = l1_loss(pred_wave_spec, target_wave_spec)
 
         # 判別器損失
-        target_wave_list = _flatten_wave_frames(batch.framed_wave_list)
-        _, y_d_gs_mpd, fmap_rs_mpd, fmap_gs_mpd = self.mpd.forward_list(
-            target_wave_list, pred_wave_list
-        )
-        _, y_d_gs_msd, fmap_rs_msd, fmap_gs_msd = self.msd.forward_list(
-            target_wave_list, pred_wave_list
-        )
+        target_wave = torch.stack(
+            [frames.reshape(-1) for frames in batch.framed_wave_list], dim=0
+        ).unsqueeze(1)  # (B, 1, wL)
+        pred_wave = torch.stack(pred_wave_list, dim=0).unsqueeze(1)  # (B, 1, wL)
+        _, y_d_gs_mpd, fmap_rs_mpd, fmap_gs_mpd = self.mpd(target_wave, pred_wave)
+        _, y_d_gs_msd, fmap_rs_msd, fmap_gs_msd = self.msd(target_wave, pred_wave)
 
         adversarial_loss = _generator_loss(y_d_gs_mpd) + _generator_loss(y_d_gs_msd)
         feature_matching_loss = _feature_loss(fmap_rs_mpd, fmap_gs_mpd) + _feature_loss(
@@ -266,14 +261,14 @@ class Model(nn.Module):
     ) -> DiscriminatorModelOutput:
         """Discriminator用の損失を計算する"""
         # 判別器の計算
-        target_wave_list = _flatten_wave_frames(batch.framed_wave_list)
-        pred_wave_list_detached = [wave.detach() for wave in pred_wave_list]
-        y_d_rs_mpd, y_d_gs_mpd, _, _ = self.mpd.forward_list(
-            target_wave_list, pred_wave_list_detached
-        )
-        y_d_rs_msd, y_d_gs_msd, _, _ = self.msd.forward_list(
-            target_wave_list, pred_wave_list_detached
-        )
+        target_wave = torch.stack(
+            [frames.reshape(-1) for frames in batch.framed_wave_list], dim=0
+        ).unsqueeze(1)  # (B, 1, wL)
+        pred_wave = (
+            torch.stack(pred_wave_list, dim=0).unsqueeze(1).detach()
+        )  # (B, 1, wL)
+        y_d_rs_mpd, y_d_gs_mpd, _, _ = self.mpd(target_wave, pred_wave)
+        y_d_rs_msd, y_d_gs_msd, _, _ = self.msd(target_wave, pred_wave)
 
         mpd_loss = _discriminator_loss(y_d_rs_mpd, y_d_gs_mpd)
         msd_loss = _discriminator_loss(y_d_rs_msd, y_d_gs_msd)

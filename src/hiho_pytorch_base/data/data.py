@@ -130,7 +130,7 @@ def preprocess(
     d: InputData,
     prepost_silence_frame_length: int,
     max_frame_length: int,
-    max_wave_frame_length: int,
+    wave_frame_length: int,
     is_eval: bool,
 ) -> OutputData:
     """全ての変換・検証・配列化処理を統合"""
@@ -249,15 +249,16 @@ def preprocess(
     # NOTE: 評価時は全体を使い、学習時は固定長にする
     if is_eval:
         wave_start_frame = 0
-        wave_frame_length = slice_length
-    elif slice_length >= max_wave_frame_length:
-        wave_start_frame = rng.integers(slice_length - max_wave_frame_length + 1)
-        wave_frame_length = max_wave_frame_length
+    elif slice_length >= wave_frame_length:
+        wave_start_frame = rng.integers(slice_length - wave_frame_length + 1)
+        framed_wave = framed_wave[
+            wave_start_frame : wave_start_frame + wave_frame_length
+        ]
     else:
         wave_start_frame = 0
-        wave_frame_length = slice_length
-
-    framed_wave = framed_wave[wave_start_frame : wave_start_frame + wave_frame_length]
+        pad_length = wave_frame_length - slice_length
+        padding = numpy.zeros((pad_length, framed_wave.shape[1]), like=framed_wave)
+        framed_wave = numpy.concatenate([framed_wave, padding], axis=0)
 
     return OutputData(
         f0=torch.from_numpy(f0).float(),
