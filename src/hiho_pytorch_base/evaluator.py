@@ -73,8 +73,8 @@ class Evaluator(nn.Module):
             for output in output_list
         ]
 
-        pred_wave_spec = torch.cat(pred_wave_spec_list, dim=0)  # (sum(wL), ?)
-        target_wave_spec = torch.cat(batch.spec_list, dim=0)  # (sum(wL), ?)
+        pred_wave_spec = torch.cat(pred_wave_spec_list, dim=0)  # (sum(fL), ?)
+        target_wave_spec = torch.cat(batch.spec_list, dim=0)  # (sum(fL), ?)
         wave_spec_loss = l1_loss(pred_wave_spec, target_wave_spec)
 
         return EvaluatorOutput(

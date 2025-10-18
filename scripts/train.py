@@ -9,6 +9,7 @@ from typing import Any
 
 import torch
 import yaml
+from torch import nn
 from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader, Dataset, Sampler
@@ -22,7 +23,15 @@ from hiho_pytorch_base.evaluator import (
     calculate_value,
 )
 from hiho_pytorch_base.generator import Generator
-from hiho_pytorch_base.model import Model, ModelOutput
+from hiho_pytorch_base.model import (
+    DiscriminatorModelOutput,
+    GeneratorModelOutput,
+    Model,
+)
+from hiho_pytorch_base.network.discriminator import (
+    MultiPeriodDiscriminator,
+    MultiScaleDiscriminator,
+)
 from hiho_pytorch_base.network.predictor import Predictor, create_predictor
 from hiho_pytorch_base.utility.pytorch_utility import (
     init_weights,
@@ -47,25 +56,35 @@ def _delete_data_num(output: DataNumProtocol) -> dict[str, Any]:
 class TrainingResults:
     """学習結果"""
 
-    train: ModelOutput
+    train_generator: GeneratorModelOutput
+    train_discriminator: DiscriminatorModelOutput
 
     def to_summary_dict(self) -> dict[str, Any]:
         """ログ出力用の辞書を生成"""
-        return {DatasetType.TRAIN.value: _delete_data_num(self.train)}
+        return {
+            DatasetType.TRAIN.value: {
+                "generator": _delete_data_num(self.train_generator),
+                "discriminator": _delete_data_num(self.train_discriminator),
+            }
+        }
 
 
 @dataclass
 class EvaluationResults:
     """評価結果"""
 
-    test: ModelOutput
+    test_generator: GeneratorModelOutput
+    test_discriminator: DiscriminatorModelOutput
     eval: EvaluatorOutput | None
     valid: EvaluatorOutput | None
 
     def to_summary_dict(self) -> dict[str, Any]:
         """ログ出力用の辞書を生成"""
         summary = {
-            DatasetType.TEST.value: _delete_data_num(self.test),
+            DatasetType.TEST.value: {
+                "generator": _delete_data_num(self.test_generator),
+                "discriminator": _delete_data_num(self.test_discriminator),
+            }
         }
         if self.eval is not None:
             summary[DatasetType.EVAL.value] = _delete_data_num(self.eval)
@@ -84,11 +103,15 @@ class TrainingContext:
     eval_loader: DataLoader | None
     valid_loader: DataLoader | None
     model: Model
+    predictor: Predictor
     evaluator: Evaluator
-    optimizer: torch.optim.Optimizer
-    scaler: GradScaler
+    generator_optimizer: torch.optim.Optimizer
+    discriminator_optimizer: torch.optim.Optimizer
+    generator_scaler: GradScaler
+    discriminator_scaler: GradScaler
     logger: Logger
-    scheduler: torch.optim.lr_scheduler.LRScheduler | None
+    generator_scheduler: torch.optim.lr_scheduler.LRScheduler | None
+    discriminator_scheduler: torch.optim.lr_scheduler.LRScheduler | None
     save_manager: SaveManager
     device: str
     epoch: int
@@ -205,7 +228,14 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
     # model
     predictor_scripted: Predictor = torch.jit.script(predictor)  # type: ignore
-    model = Model(model_config=config.model, predictor=predictor_scripted)
+    mpd = MultiPeriodDiscriminator()
+    msd = MultiScaleDiscriminator()
+    model = Model(
+        model_config=config.model,
+        predictor=predictor_scripted,
+        mpd=mpd,
+        msd=msd,
+    )
     if config.train.weight_initializer is not None:
         init_weights(model, name=config.train.weight_initializer)
     model.to(device)
@@ -217,8 +247,15 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     evaluator = Evaluator(generator=generator)
 
     # optimizer
-    optimizer = make_optimizer(config_dict=config.train.optimizer, model=model)
-    scaler = GradScaler(device, enabled=config.train.use_amp)
+    generator_optimizer = make_optimizer(
+        config_dict=config.train.generator_optimizer, model=predictor
+    )
+    discriminator_optimizer = make_optimizer(
+        config_dict=config.train.discriminator_optimizer,
+        model=nn.ModuleList([mpd, msd]),
+    )
+    generator_scaler = GradScaler(device, enabled=config.train.use_amp)
+    discriminator_scaler = GradScaler(device, enabled=config.train.use_amp)
 
     # logger
     logger = Logger(
@@ -229,11 +266,22 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     )
 
     # scheduler
-    scheduler = None
-    if config.train.scheduler is not None:
-        scheduler = make_scheduler(
-            config_dict=config.train.scheduler, optimizer=optimizer
+    generator_scheduler = (
+        make_scheduler(
+            config_dict=config.train.generator_scheduler,
+            optimizer=generator_optimizer,
         )
+        if config.train.generator_scheduler is not None
+        else None
+    )
+    discriminator_scheduler = (
+        make_scheduler(
+            config_dict=config.train.discriminator_scheduler,
+            optimizer=discriminator_optimizer,
+        )
+        if config.train.discriminator_scheduler is not None
+        else None
+    )
 
     # save
     save_manager = SaveManager(
@@ -251,11 +299,15 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
         eval_loader=eval_loader,
         valid_loader=valid_loader,
         model=model,
+        predictor=predictor,
         evaluator=evaluator,
-        optimizer=optimizer,
-        scaler=scaler,
+        generator_optimizer=generator_optimizer,
+        discriminator_optimizer=discriminator_optimizer,
+        generator_scaler=generator_scaler,
+        discriminator_scaler=discriminator_scaler,
         logger=logger,
-        scheduler=scheduler,
+        generator_scheduler=generator_scheduler,
+        discriminator_scheduler=discriminator_scheduler,
         save_manager=save_manager,
         device=device,
         epoch=0,
@@ -269,69 +321,123 @@ def load_snapshot(context: TrainingContext) -> None:
     snapshot = torch.load(context.snapshot_path, map_location=context.device)
 
     context.model.load_state_dict(snapshot["model"])
-    context.optimizer.load_state_dict(snapshot["optimizer"])
-    context.scaler.load_state_dict(snapshot["scaler"])
+    context.generator_optimizer.load_state_dict(snapshot["generator_optimizer"])
+    context.discriminator_optimizer.load_state_dict(snapshot["discriminator_optimizer"])
+    context.generator_scaler.load_state_dict(snapshot["generator_scaler"])
+    context.discriminator_scaler.load_state_dict(snapshot["discriminator_scaler"])
     context.logger.load_state_dict(snapshot["logger"])
 
     context.iteration = snapshot["iteration"]
     context.epoch = snapshot["epoch"]
 
-    if context.scheduler is not None:
-        context.scheduler.last_epoch = context.epoch
+    if context.generator_scheduler is not None:
+        context.generator_scheduler.last_epoch = context.epoch
+    if context.discriminator_scheduler is not None:
+        context.discriminator_scheduler.last_epoch = context.epoch
 
 
 def train_one_epoch(context: TrainingContext) -> TrainingResults:
     """１エポックの学習処理"""
     context.model.train()
-    if hasattr(context.optimizer, "train"):
-        context.optimizer.train()  # type: ignore
+    if hasattr(context.generator_optimizer, "train"):
+        context.generator_optimizer.train()  # type: ignore
+    if hasattr(context.discriminator_optimizer, "train"):
+        context.discriminator_optimizer.train()  # type: ignore
 
     gradient_accumulation = context.config.train.gradient_accumulation
-    context.optimizer.zero_grad()  # NOTE: 端数分の勾配を消す
+    context.generator_optimizer.zero_grad()  # NOTE: 端数分の勾配を消す
+    context.discriminator_optimizer.zero_grad()
 
-    batch: BatchOutput
-    train_results: list[ModelOutput] = []
+    generator_results: list[GeneratorModelOutput] = []
+    discriminator_results: list[DiscriminatorModelOutput] = []
 
     for batch_index, batch in enumerate(context.train_loader, start=1):
+        batch = batch.to_device(context.device, non_blocking=True)
+
+        # Discriminatorの更新
         with autocast(context.device, enabled=context.config.train.use_amp):
-            batch = batch.to_device(context.device, non_blocking=True)
-            result: ModelOutput = context.model(batch)
+            spec1_list, spec2_list, pred_wave_list = context.model.forward(batch)
+            discriminator_output = context.model.calc_discriminator(
+                batch=batch,
+                pred_wave_list=pred_wave_list,
+            )
+        discriminator_loss = discriminator_output.loss / gradient_accumulation
+        if discriminator_loss.isnan():
+            raise ValueError("discriminator loss is NaN")
 
-        loss = result.loss / gradient_accumulation
-        if loss.isnan():
-            raise ValueError("loss is NaN")
-
-        context.scaler.scale(loss).backward()
-        train_results.append(result.detach_cpu())
+        context.discriminator_scaler.scale(discriminator_loss).backward()
 
         if batch_index % gradient_accumulation == 0:
-            context.scaler.step(context.optimizer)
-            context.scaler.update()
-            context.optimizer.zero_grad()
+            context.discriminator_scaler.step(context.discriminator_optimizer)
+            context.discriminator_scaler.update()
+            context.discriminator_optimizer.zero_grad()
+
+        discriminator_results.append(discriminator_output.detach_cpu())
+
+        # Generatorの更新
+        with autocast(context.device, enabled=context.config.train.use_amp):
+            generator_output = context.model.calc_generator(
+                batch=batch,
+                spec1_list=spec1_list,
+                spec2_list=spec2_list,
+                pred_wave_list=pred_wave_list,
+            )
+        generator_loss = generator_output.loss / gradient_accumulation
+        if generator_loss.isnan():
+            raise ValueError("generator loss is NaN")
+
+        context.generator_scaler.scale(generator_loss).backward()
+
+        if batch_index % gradient_accumulation == 0:
+            context.generator_scaler.step(context.generator_optimizer)
+            context.generator_scaler.update()
+            context.generator_optimizer.zero_grad()
             context.iteration += 1
 
-    if context.scheduler is not None:
-        context.scheduler.step()
+        generator_results.append(generator_output.detach_cpu())
 
-    return TrainingResults(train=reduce_result(train_results))
+    if context.generator_scheduler is not None:
+        context.generator_scheduler.step()
+    if context.discriminator_scheduler is not None:
+        context.discriminator_scheduler.step()
+
+    return TrainingResults(
+        train_generator=reduce_result(generator_results),
+        train_discriminator=reduce_result(discriminator_results),
+    )
 
 
 @torch.no_grad()
 def evaluate(context: TrainingContext) -> EvaluationResults:
     """評価値を計算する"""
     context.model.eval()
-    if hasattr(context.optimizer, "eval"):
-        context.optimizer.eval()  # type: ignore
+    if hasattr(context.generator_optimizer, "eval"):
+        context.generator_optimizer.eval()  # type: ignore
+    if hasattr(context.discriminator_optimizer, "eval"):
+        context.discriminator_optimizer.eval()  # type: ignore
 
     batch: BatchOutput
 
     # test評価
-    test_result_list: list[ModelOutput] = []
+    test_generator_list: list[GeneratorModelOutput] = []
+    test_discriminator_list: list[DiscriminatorModelOutput] = []
     for batch in context.test_loader:
         batch = batch.to_device(context.device, non_blocking=True)
-        model_result: ModelOutput = context.model(batch)
-        test_result_list.append(model_result.detach_cpu())
-    test_result = reduce_result(test_result_list)
+        spec1_list, spec2_list, pred_wave_list = context.model.forward(batch)
+        generator_result = context.model.calc_generator(
+            batch=batch,
+            spec1_list=spec1_list,
+            spec2_list=spec2_list,
+            pred_wave_list=pred_wave_list,
+        )
+        discriminator_result = context.model.calc_discriminator(
+            batch=batch,
+            pred_wave_list=pred_wave_list,
+        )
+        test_generator_list.append(generator_result.detach_cpu())
+        test_discriminator_list.append(discriminator_result.detach_cpu())
+    test_generator = reduce_result(test_generator_list)
+    test_discriminator = reduce_result(test_discriminator_list)
 
     # eval評価
     eval_result = None
@@ -353,7 +459,12 @@ def evaluate(context: TrainingContext) -> EvaluationResults:
             valid_result_list.append(evaluator_result.detach_cpu())
         valid_result = reduce_result(valid_result_list)
 
-    return EvaluationResults(test=test_result, eval=eval_result, valid=valid_result)
+    return EvaluationResults(
+        test_generator=test_generator,
+        test_discriminator=test_discriminator,
+        eval=eval_result,
+        valid=valid_result,
+    )
 
 
 def save_predictor(
@@ -361,7 +472,7 @@ def save_predictor(
 ) -> None:
     """評価結果に基づいてPredictorを保存する"""
     if evaluation_results.valid is not None:
-        evaluation_value = calculate_value(evaluation_results.valid).item()
+        evaluation_value = float(calculate_value(evaluation_results.valid))
     else:
         evaluation_value = 0
 
@@ -373,8 +484,10 @@ def save_checkpoint(context: TrainingContext) -> None:
     torch.save(
         {
             "model": context.model.state_dict(),
-            "optimizer": context.optimizer.state_dict(),
-            "scaler": context.scaler.state_dict(),
+            "generator_optimizer": context.generator_optimizer.state_dict(),
+            "discriminator_optimizer": context.discriminator_optimizer.state_dict(),
+            "generator_scaler": context.generator_scaler.state_dict(),
+            "discriminator_scaler": context.discriminator_scaler.state_dict(),
             "logger": context.logger.state_dict(),
             "iteration": context.iteration,
             "epoch": context.epoch,
@@ -411,7 +524,10 @@ def training_loop(context: TrainingContext) -> None:
             summary = {
                 "iteration": context.iteration,
                 "epoch": context.epoch,
-                "lr": context.optimizer.param_groups[0]["lr"],
+                "lr": context.generator_optimizer.param_groups[0]["lr"],
+                "lr_discriminator": context.discriminator_optimizer.param_groups[0][
+                    "lr"
+                ],
             }
             summary.update(training_results.to_summary_dict())
 

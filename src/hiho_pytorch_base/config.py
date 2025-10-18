@@ -84,6 +84,8 @@ class ModelConfig(_Model):
     acoustic_loss1_weight: float
     acoustic_loss2_weight: float
     vocoder_spec_loss_weight: float
+    vocoder_adv_loss_weight: float
+    vocoder_fm_loss_weight: float
 
 
 class TrainConfig(_Model):
@@ -97,8 +99,10 @@ class TrainConfig(_Model):
     snapshot_epoch: int
     stop_epoch: int
     model_save_num: int
-    optimizer: dict[str, Any]
-    scheduler: dict[str, Any] | None = None
+    generator_optimizer: dict[str, Any]
+    discriminator_optimizer: dict[str, Any]
+    generator_scheduler: dict[str, Any] | None = None
+    discriminator_scheduler: dict[str, Any] | None = None
     weight_initializer: str | None = None
     pretrained_predictor_path: Path | None = None
     prefetch_workers: int = 256

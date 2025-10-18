@@ -1,5 +1,6 @@
 """Discriminatorネットワークモジュール（HiFi-GANベース）"""
 
+import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import AvgPool1d, Conv1d, Conv2d
@@ -122,6 +123,52 @@ class MultiPeriodDiscriminator(nn.Module):
 
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
+    def forward_list(  # noqa: D102
+        self,
+        y_list: list[Tensor],  # [(wL,)]
+        y_hat_list: list[Tensor],  # [(wL,)]
+    ) -> tuple[list[Tensor], list[Tensor], list[list[Tensor]], list[list[Tensor]]]:
+        all_y_d_rs = []
+        all_y_d_gs = []
+        all_fmap_rs = []
+        all_fmap_gs = []
+
+        for y, y_hat in zip(y_list, y_hat_list, strict=True):
+            y_batch = y.unsqueeze(0).unsqueeze(0)
+            y_hat_batch = y_hat.unsqueeze(0).unsqueeze(0)
+
+            y_d_rs, y_d_gs, fmap_rs, fmap_gs = self.forward(y_batch, y_hat_batch)
+
+            all_y_d_rs.append(y_d_rs)
+            all_y_d_gs.append(y_d_gs)
+            all_fmap_rs.append(fmap_rs)
+            all_fmap_gs.append(fmap_gs)
+
+        num_discriminators = len(all_y_d_rs[0])
+        y_d_rs_merged = []
+        y_d_gs_merged = []
+        fmap_rs_merged = []
+        fmap_gs_merged = []
+
+        for i in range(num_discriminators):
+            y_d_rs_merged.append(torch.cat([batch[i] for batch in all_y_d_rs], dim=0))
+            y_d_gs_merged.append(torch.cat([batch[i] for batch in all_y_d_gs], dim=0))
+
+            num_layers = len(all_fmap_rs[0][i])
+            fmap_r_layers = []
+            fmap_g_layers = []
+            for j in range(num_layers):
+                fmap_r_layers.append(
+                    torch.cat([batch[i][j] for batch in all_fmap_rs], dim=0)
+                )
+                fmap_g_layers.append(
+                    torch.cat([batch[i][j] for batch in all_fmap_gs], dim=0)
+                )
+            fmap_rs_merged.append(fmap_r_layers)
+            fmap_gs_merged.append(fmap_g_layers)
+
+        return y_d_rs_merged, y_d_gs_merged, fmap_rs_merged, fmap_gs_merged
+
 
 class DiscriminatorS(nn.Module):
     """Scale-based Discriminator"""
@@ -195,3 +242,49 @@ class MultiScaleDiscriminator(nn.Module):
             fmap_gs.append(fmap_g)
 
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
+
+    def forward_list(  # noqa: D102
+        self,
+        y_list: list[Tensor],  # [(wL,)]
+        y_hat_list: list[Tensor],  # [(wL,)]
+    ) -> tuple[list[Tensor], list[Tensor], list[list[Tensor]], list[list[Tensor]]]:
+        all_y_d_rs = []
+        all_y_d_gs = []
+        all_fmap_rs = []
+        all_fmap_gs = []
+
+        for y, y_hat in zip(y_list, y_hat_list, strict=True):
+            y_batch = y.unsqueeze(0).unsqueeze(0)
+            y_hat_batch = y_hat.unsqueeze(0).unsqueeze(0)
+
+            y_d_rs, y_d_gs, fmap_rs, fmap_gs = self.forward(y_batch, y_hat_batch)
+
+            all_y_d_rs.append(y_d_rs)
+            all_y_d_gs.append(y_d_gs)
+            all_fmap_rs.append(fmap_rs)
+            all_fmap_gs.append(fmap_gs)
+
+        num_discriminators = len(all_y_d_rs[0])
+        y_d_rs_merged = []
+        y_d_gs_merged = []
+        fmap_rs_merged = []
+        fmap_gs_merged = []
+
+        for i in range(num_discriminators):
+            y_d_rs_merged.append(torch.cat([batch[i] for batch in all_y_d_rs], dim=0))
+            y_d_gs_merged.append(torch.cat([batch[i] for batch in all_y_d_gs], dim=0))
+
+            num_layers = len(all_fmap_rs[0][i])
+            fmap_r_layers = []
+            fmap_g_layers = []
+            for j in range(num_layers):
+                fmap_r_layers.append(
+                    torch.cat([batch[i][j] for batch in all_fmap_rs], dim=0)
+                )
+                fmap_g_layers.append(
+                    torch.cat([batch[i][j] for batch in all_fmap_gs], dim=0)
+                )
+            fmap_rs_merged.append(fmap_r_layers)
+            fmap_gs_merged.append(fmap_g_layers)
+
+        return y_d_rs_merged, y_d_gs_merged, fmap_rs_merged, fmap_gs_merged
