@@ -13,6 +13,10 @@ import yaml
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import DatasetType, create_dataset
 from hiho_pytorch_base.model import Model
+from hiho_pytorch_base.network.discriminator import (
+    MultiPeriodDiscriminator,
+    MultiScaleDiscriminator,
+)
 from hiho_pytorch_base.network.predictor import create_predictor
 from scripts.generate import generate
 from scripts.train import train
@@ -46,7 +50,11 @@ def test_dataset_creation(train_config: Config) -> None:
 def test_model_creation(train_config: Config) -> None:
     """モデルの作成テスト"""
     predictor = create_predictor(train_config.network)
-    model = Model(model_config=train_config.model, predictor=predictor)
+    mpd = MultiPeriodDiscriminator()
+    msd = MultiScaleDiscriminator()
+    model = Model(
+        model_config=train_config.model, predictor=predictor, mpd=mpd, msd=msd
+    )
 
     assert model is not None
     assert hasattr(model, "forward")

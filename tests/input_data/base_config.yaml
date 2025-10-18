@@ -5,6 +5,7 @@ dataset:
     lab_pathlist_path: "tests/data/test_data/train_lab_pathlist.txt"
     silence_pathlist_path: "tests/data/test_data/train_silence_pathlist.txt"
     spec_pathlist_path: "tests/data/test_data/train_spec_pathlist.txt"
+    wave_pathlist_path: "tests/data/test_data/train_wave_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
   valid:
@@ -13,10 +14,12 @@ dataset:
     lab_pathlist_path: "tests/data/test_data/valid_lab_pathlist.txt"
     silence_pathlist_path: "tests/data/test_data/valid_silence_pathlist.txt"
     spec_pathlist_path: "tests/data/test_data/valid_spec_pathlist.txt"
+    wave_pathlist_path: "tests/data/test_data/valid_wave_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
-  prepost_silence_length: 500
-  max_sampling_length: 100
+  prepost_silence_frame_length: 5
+  max_frame_length: 100
+  max_wave_frame_length: 50
   train_num: null
   test_num: 10
   eval_for_test: true
@@ -24,23 +27,36 @@ dataset:
   seed: 42
 
 network:
-  phoneme_size: 49
-  phoneme_embedding_size: 24
-  f0_embedding_size: 4
-  hidden_size: 32
-  conformer_block_num: 4
-  conformer_dropout_rate: 0.1
-  speaker_size: 3
-  speaker_embedding_size: 8
-  output_size: 80
-  postnet_layers: 5
-  postnet_kernel_size: 5
-  postnet_dropout: 0.1
+  acoustic:
+    phoneme_size: 49
+    phoneme_embedding_size: 24
+    f0_embedding_size: 4
+    hidden_size: 32
+    conformer_block_num: 4
+    conformer_dropout_rate: 0.1
+    speaker_size: 3
+    speaker_embedding_size: 8
+    output_size: 80
+    postnet_layers: 5
+    postnet_kernel_size: 5
+    postnet_dropout: 0.1
+  vocoder:
+    upsample_rates: [8, 8, 2, 2]
+    upsample_kernel_sizes: [16, 16, 4, 4]
+    upsample_initial_channel: 128
+    resblock: "1"
+    resblock_kernel_sizes: [3, 7, 11]
+    resblock_dilation_sizes: [[1, 3, 5], [1, 3, 5], [1, 3, 5]]
+  frame_size: 256
+  sampling_rate: 24000
 
 model:
-  predictor_loss1_weight: 1.0
-  predictor_loss2_weight: 1.0
+  # FIXME: あとでhifi-ganの実装と合わせる
+  acoustic_loss1_weight: 1.0
+  acoustic_loss2_weight: 1.0
   vocoder_spec_loss_weight: 45.0
+  vocoder_adv_loss_weight: 1.0
+  vocoder_fm_loss_weight: 2.0
 
 train:
   batch_size: 4
@@ -51,10 +67,14 @@ train:
   snapshot_epoch: 4
   stop_epoch: 10
   model_save_num: 2
-  optimizer:
+  generator_optimizer:
     name: "RAdamScheduleFree"
     lr: 0.003
-  scheduler: null
+  discriminator_optimizer:
+    name: "RAdamScheduleFree"
+    lr: 0.003
+  generator_scheduler: null
+  discriminator_scheduler: null
   prefetch_workers: 256
   preprocess_workers: 0
   use_gpu: false

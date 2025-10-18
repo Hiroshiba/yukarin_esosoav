@@ -227,7 +227,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     print("predictor:", predictor)
 
     # model
-    predictor_scripted: Predictor = torch.jit.script(predictor)  # type: ignore
+    predictor_scripted: Predictor = torch.compile(predictor)  # type: ignore
     mpd = MultiPeriodDiscriminator()
     msd = MultiScaleDiscriminator()
     model = Model(

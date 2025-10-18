@@ -131,13 +131,24 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
     def generate_spec(file_path: Path) -> None:
         stem = file_path.stem
         spec_length = int(durations[stem] * spec_rate)
-        spec_data = rng.normal(0, 1, (spec_length, config.network.output_size)).astype(
-            np.float32
-        )
+        spec_data = rng.normal(
+            0, 1, (spec_length, config.network.acoustic.output_size)
+        ).astype(np.float32)
         sampling_data = SamplingData(array=spec_data, rate=spec_rate)
         sampling_data.save(file_path)
 
     _setup_data(generate_spec, "spec", "npy")
+
+    # Waveデータ
+    def generate_wave(file_path: Path) -> None:
+        stem = file_path.stem
+        wave_rate = config.network.sampling_rate
+        wave_length = int(durations[stem] * wave_rate)
+        wave_data = rng.uniform(-0.5, 0.5, wave_length).astype(np.float32)
+        sampling_data = SamplingData(array=wave_data[:, np.newaxis], rate=wave_rate)
+        sampling_data.save(file_path)
+
+    _setup_data(generate_wave, "wave", "npy")
 
     # 話者マッピング
     speaker_names = ["A", "B", "C"]
