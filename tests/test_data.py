@@ -50,12 +50,22 @@ def create_basic_input_data(
         .normal(0, 1, (total_frames, spec_dim))
         .astype(numpy.float32)
     )
+
     silence_array = numpy.random.default_rng(1).random(total_frames) < 0.2
+
+    wave_rate = int(frame_rate * 80)
+    total_wave_samples = int(total_time * wave_rate)
+    wave_array = (
+        numpy.random.default_rng(2)
+        .uniform(-0.5, 0.5, total_wave_samples)
+        .astype(numpy.float32)
+    )
 
     f0_data = SamplingData(array=f0_values[:, numpy.newaxis], rate=frame_rate)
     volume_data = SamplingData(array=volume_db[:, numpy.newaxis], rate=frame_rate)
     silence_data = SamplingData(array=silence_array[:, numpy.newaxis], rate=frame_rate)
     spec_data = SamplingData(array=spec_array, rate=frame_rate)
+    wave_data = SamplingData(array=wave_array[:, numpy.newaxis], rate=wave_rate)
 
     return InputData(
         phonemes=phonemes,
@@ -63,6 +73,7 @@ def create_basic_input_data(
         volume_data=volume_data,
         silence_data=silence_data,
         spec_data=spec_data,
+        wave_data=wave_data,
         speaker_id=speaker_id,
     )
 
@@ -104,8 +115,9 @@ def test_input_data_structure():
 
     output_data = preprocess(
         input_data,
-        prepost_silence_length=2,
-        max_sampling_length=1000,
+        prepost_silence_frame_length=2,
+        max_frame_length=1000,
+        wave_frame_length=5,
         is_eval=True,
     )
     assert_output_data_types(output_data)
