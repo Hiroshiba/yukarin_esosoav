@@ -6,6 +6,7 @@ import torch
 from hiho_pytorch_base.data.data import InputData, OutputData, preprocess
 from hiho_pytorch_base.data.phoneme import ArpaPhoneme
 from hiho_pytorch_base.data.sampling_data import SamplingData
+from hiho_pytorch_base.data.wave import Wave
 
 
 def create_arpa_phonemes(
@@ -65,7 +66,7 @@ def create_basic_input_data(
     volume_data = SamplingData(array=volume_db[:, numpy.newaxis], rate=frame_rate)
     silence_data = SamplingData(array=silence_array[:, numpy.newaxis], rate=frame_rate)
     spec_data = SamplingData(array=spec_array, rate=frame_rate)
-    wave_data = SamplingData(array=wave_array[:, numpy.newaxis], rate=wave_rate)
+    wave_data = Wave(wave=wave_array[:, numpy.newaxis], sampling_rate=wave_rate)
 
     return InputData(
         phonemes=phonemes,
@@ -115,6 +116,8 @@ def test_input_data_structure():
 
     output_data = preprocess(
         input_data,
+        frame_size=256,
+        sampling_rate=24000,
         prepost_silence_frame_length=2,
         max_frame_length=1000,
         wave_frame_length=5,
