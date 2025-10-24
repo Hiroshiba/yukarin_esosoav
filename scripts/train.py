@@ -240,6 +240,17 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     msd = MultiScaleDiscriminator(
         initial_channel=config.network.discriminator.msd_initial_channel
     )
+    if config.train.pretrained_discriminator_path is not None:
+        state_dict = torch.load(
+            config.train.pretrained_discriminator_path, map_location=device
+        )
+        if "mpd" in state_dict and "msd" in state_dict:  # NOTE: hifi-ganの形式
+            mpd.load_state_dict(state_dict["mpd"])
+            msd.load_state_dict(state_dict["msd"])
+        else:
+            raise ValueError(
+                "pretrained_discriminator_path state_dict does not have 'mpd' and 'msd' keys"
+            )
     model = Model(
         model_config=config.model,
         predictor=predictor_scripted,
