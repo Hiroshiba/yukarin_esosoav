@@ -31,6 +31,8 @@ class DatasetConfig(_Model):
 
     train: DataFileConfig
     valid: DataFileConfig | None = None
+    frame_size: int
+    sampling_rate: int
     prepost_silence_frame_length: int
     max_frame_length: int
     wave_frame_length: int
@@ -148,6 +150,8 @@ class Config(_Model):
 
     def validate_config(self) -> None:
         """設定の妥当性を検証"""
+        assert self.dataset.frame_size == self.network.frame_size
+        assert self.dataset.sampling_rate == self.network.sampling_rate
         assert self.train.eval_epoch % self.train.log_epoch == 0
 
     def add_git_info(self) -> None:

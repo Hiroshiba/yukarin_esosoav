@@ -11,6 +11,7 @@ from hiho_pytorch_base.data.sampling_data import (
     ResampleInterpolateKind,
     SamplingData,
 )
+from hiho_pytorch_base.data.wave import Wave
 
 
 @dataclass
@@ -22,7 +23,7 @@ class InputData:
     volume_data: SamplingData
     silence_data: SamplingData
     spec_data: SamplingData  # NOTE: 対数メルスペクトログラム
-    wave_data: SamplingData
+    wave_data: Wave
     speaker_id: int
 
 
@@ -128,6 +129,8 @@ def create_frame_phoneme_ids(
 
 def preprocess(
     d: InputData,
+    frame_size: int,
+    sampling_rate: int,
     prepost_silence_frame_length: int,
     max_frame_length: int,
     wave_frame_length: int,
@@ -137,10 +140,19 @@ def preprocess(
     rng = numpy.random.default_rng()
 
     frame_rate = float(d.spec_data.rate)
-    wave_rate = float(d.wave_data.rate)
+    wave_rate = float(d.wave_data.sampling_rate)
     if wave_rate % frame_rate != 0:
         raise ValueError(
             f"wave_rate ({wave_rate}) はframe_rate ({frame_rate}) の整数倍である必要があります"
+        )
+
+    if frame_rate != float(sampling_rate / frame_size):
+        raise ValueError(
+            f"frame_rate ({frame_rate}) が期待値 ({float(sampling_rate / frame_size)}) と一致しません"
+        )
+    if wave_rate != sampling_rate:
+        raise ValueError(
+            f"wave_rate ({wave_rate}) が sampling_rate ({sampling_rate}) と一致しません"
         )
 
     f0 = d.f0_data.resample(
@@ -153,10 +165,9 @@ def preprocess(
         sampling_rate=frame_rate, index=0, kind=ResampleInterpolateKind.nearest
     )
     spec = d.spec_data.array
-    wave = d.wave_data.array
+    wave = d.wave_data.wave
 
     # 波形をフレーム化
-    frame_size = int(wave_rate / frame_rate)
     trimmed_wave_length = (len(wave) // frame_size) * frame_size
     wave = wave[:trimmed_wave_length]
     framed_wave = wave.reshape(-1, frame_size)

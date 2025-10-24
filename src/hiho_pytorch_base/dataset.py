@@ -18,6 +18,7 @@ from hiho_pytorch_base.data.data import (
 )
 from hiho_pytorch_base.data.phoneme import ArpaPhoneme
 from hiho_pytorch_base.data.sampling_data import SamplingData
+from hiho_pytorch_base.data.wave import Wave
 from hiho_pytorch_base.utility.upath_utility import to_local_path
 
 
@@ -41,7 +42,7 @@ class LazyInputData:
             volume_data=SamplingData.load(to_local_path(self.volume_path)),
             silence_data=SamplingData.load(to_local_path(self.silence_path)),
             spec_data=SamplingData.load(to_local_path(self.spec_path)),
-            wave_data=SamplingData.load(to_local_path(self.wave_path)),
+            wave_data=Wave.load(to_local_path(self.wave_path)),
             speaker_id=self.speaker_id,
         )
 
@@ -79,6 +80,8 @@ class Dataset(BaseDataset[OutputData]):
         try:
             return preprocess(
                 self.datas[i].fetch(),
+                frame_size=self.config.frame_size,
+                sampling_rate=self.config.sampling_rate,
                 prepost_silence_frame_length=self.config.prepost_silence_frame_length,
                 max_frame_length=self.config.max_frame_length,
                 wave_frame_length=self.config.wave_frame_length,

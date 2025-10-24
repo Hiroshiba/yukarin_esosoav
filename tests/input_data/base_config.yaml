@@ -17,6 +17,8 @@ dataset:
     wave_pathlist_path: "tests/data/test_data/valid_wave_pathlist.txt"
     speaker_dict_path: "tests/data/test_data/speaker_dict.json"
     root_dir: "tests/data/test_data"
+  frame_size: 256
+  sampling_rate: 8000
   prepost_silence_frame_length: 5
   max_frame_length: 50
   wave_frame_length: 5
