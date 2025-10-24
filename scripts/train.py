@@ -224,6 +224,11 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
             config.train.pretrained_predictor_path, map_location=device
         )
         predictor.load_state_dict(state_dict)
+    if config.train.pretrained_vocoder_path is not None:
+        state_dict = torch.load(
+            config.train.pretrained_vocoder_path, map_location=device
+        )
+        predictor.vocoder.load_state_dict(state_dict)
     print("predictor:", predictor)
 
     # model

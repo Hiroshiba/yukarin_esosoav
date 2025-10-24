@@ -115,6 +115,7 @@ class TrainConfig(_Model):
     discriminator_scheduler: dict[str, Any] | None = None
     weight_initializer: str | None = None
     pretrained_predictor_path: Path | None = None
+    pretrained_vocoder_path: Path | None = None
     prefetch_workers: int = 256
     preprocess_workers: int = 0
     use_gpu: bool = True
