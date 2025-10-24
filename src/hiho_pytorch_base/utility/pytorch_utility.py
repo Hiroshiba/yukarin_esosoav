@@ -9,7 +9,7 @@ import numpy
 import torch
 import torch_optimizer
 from torch import nn, optim
-from torch.optim.lr_scheduler import LRScheduler, StepLR
+from torch.optim.lr_scheduler import ExponentialLR, LRScheduler, StepLR
 from torch.optim.optimizer import Optimizer
 
 
@@ -107,6 +107,8 @@ def make_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LRSched
     scheduler: LRScheduler
     if n == "step":
         scheduler = StepLR(optimizer, **cp)
+    elif n == "exponentiallr":
+        scheduler = ExponentialLR(optimizer, **cp)
     elif n == "warmup":
         scheduler = WarmupLR(optimizer, **cp)
     else:
