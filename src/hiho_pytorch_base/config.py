@@ -1,6 +1,5 @@
 """機械学習プロジェクトの設定モジュール"""
 
-from pathlib import Path
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -114,9 +113,9 @@ class TrainConfig(_Model):
     generator_scheduler: dict[str, Any] | None = None
     discriminator_scheduler: dict[str, Any] | None = None
     weight_initializer: str | None = None
-    pretrained_predictor_path: Path | None = None
-    pretrained_vocoder_path: Path | None = None
-    pretrained_discriminator_path: Path | None = None
+    pretrained_predictor_path: UPathField | None = None
+    pretrained_vocoder_path: UPathField | None = None
+    pretrained_discriminator_path: UPathField | None = None
     prefetch_workers: int = 256
     preprocess_workers: int = 0
     use_gpu: bool = True
