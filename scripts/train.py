@@ -35,6 +35,7 @@ from hiho_pytorch_base.utility.train_utility import (
     SaveManager,
     reduce_result,
 )
+from hiho_pytorch_base.utility.upath_utility import to_local_path
 
 
 def _delete_data_num(output: DataNumProtocol) -> dict[str, Any]:
@@ -198,7 +199,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
     device = "cuda" if config.train.use_gpu else "cpu"
     if config.train.pretrained_predictor_path is not None:
         state_dict = torch.load(
-            config.train.pretrained_predictor_path, map_location=device
+            to_local_path(config.train.pretrained_predictor_path), map_location=device
         )
         predictor.load_state_dict(state_dict)
     print("predictor:", predictor)
