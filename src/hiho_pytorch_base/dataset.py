@@ -46,14 +46,27 @@ class LazyInputData:
         )
 
 
-def prefetch_datas(datas: list[LazyInputData], num_prefetch: int) -> None:
-    """データセットを前もって読み込む"""
+def prefetch_datas(
+    train_datas: list[LazyInputData],
+    test_datas: list[LazyInputData],
+    valid_datas: list[LazyInputData] | None,
+    train_indices: list[int],
+    train_batch_size: int,
+    num_prefetch: int,
+) -> None:
+    """データセットを学習順序に従って前もって読み込む"""
     if num_prefetch <= 0:
         return
 
-    # TODO: これだとメインがエラーで落ちてもスレッドの完了を待ってしまうので、threading.Thread(daemon=True)に変えたい
+    prefetch_order: list[LazyInputData] = []
+    prefetch_order += [train_datas[i] for i in train_indices[:train_batch_size]]
+    prefetch_order += test_datas
+    prefetch_order += [train_datas[i] for i in train_indices[train_batch_size:]]
+    if valid_datas is not None:
+        prefetch_order += valid_datas
+
     with ThreadPoolExecutor(max_workers=num_prefetch) as executor:
-        for data in datas:
+        for data in prefetch_order:
             executor.submit(data.fetch)
 
 
