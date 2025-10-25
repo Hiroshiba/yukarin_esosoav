@@ -4,6 +4,7 @@ import argparse
 import threading
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -184,11 +185,17 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
     # prefetch
     train_indices = torch.randperm(len(datasets.train)).tolist()
-    datas = datasets.train.datas + datasets.test.datas
-    datas += datasets.eval.datas if datasets.eval is not None else []
-    datas += datasets.valid.datas if datasets.valid is not None else []
     threading.Thread(
-        target=prefetch_datas, args=(datas, config.train.prefetch_workers), daemon=True
+        target=partial(
+            prefetch_datas,
+            train_datas=datasets.train.datas,
+            test_datas=datasets.test.datas,
+            valid_datas=datasets.valid.datas if datasets.valid is not None else None,
+            train_indices=train_indices,
+            train_batch_size=config.train.batch_size,
+            num_prefetch=config.train.prefetch_workers,
+        ),
+        daemon=True,
     ).start()
 
     # data loader
