@@ -229,7 +229,12 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
         state_dict = torch.load(
             to_local_path(config.train.pretrained_vocoder_path), map_location=device
         )
-        predictor.vocoder.load_state_dict(state_dict)
+        if "generator" in state_dict:  # NOTE: hifi-ganの形式
+            predictor.vocoder.load_state_dict(state_dict["generator"])
+        else:
+            raise ValueError(
+                "pretrained_vocoder_path state_dict does not have 'generator' key"
+            )
     print("predictor:", predictor)
 
     # model
