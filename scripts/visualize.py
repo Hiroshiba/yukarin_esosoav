@@ -8,7 +8,6 @@
 
 import argparse
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import gradio as gr
@@ -19,6 +18,7 @@ import pandas as pd
 import yaml
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from upath import UPath
 
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.data.data import OutputData
@@ -53,7 +53,7 @@ class FigureState:
 class VisualizationApp:
     """可視化アプリケーション"""
 
-    def __init__(self, config_path: Path, initial_dataset_type: DatasetType):
+    def __init__(self, config_path: UPath, initial_dataset_type: DatasetType):
         self.config_path = config_path
         self.initial_dataset_type = initial_dataset_type
 
@@ -62,8 +62,7 @@ class VisualizationApp:
 
     def _create_dataset(self) -> DatasetCollection:
         """データセットを作成"""
-        with self.config_path.open() as f:
-            config = Config.from_dict(yaml.safe_load(f))
+        config = Config.from_dict(yaml.safe_load(self.config_path.read_text()))
         return create_dataset(config.dataset)
 
     def _get_output_data(self, index: int, dataset_type: DatasetType) -> OutputData:
@@ -299,7 +298,7 @@ shape: {tuple(output_data.target_scalar.shape)}
         demo.launch()
 
 
-def visualize(config_path: Path, dataset_type: DatasetType) -> None:
+def visualize(config_path: UPath, dataset_type: DatasetType) -> None:
     """指定されたデータセットをGradio UIで可視化する"""
     app = VisualizationApp(config_path, dataset_type)
     app.launch()
@@ -307,7 +306,7 @@ def visualize(config_path: Path, dataset_type: DatasetType) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="データセットのビジュアライゼーション")
-    parser.add_argument("config_path", type=Path, help="設定ファイルのパス")
+    parser.add_argument("config_path", type=UPath, help="設定ファイルのパス")
     parser.add_argument(
         "--dataset_type", type=DatasetType, required=True, help="データセットタイプ"
     )

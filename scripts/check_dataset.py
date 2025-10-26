@@ -4,23 +4,20 @@ import argparse
 import multiprocessing
 import traceback
 from functools import partial
-from pathlib import Path
 
 import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from upath import UPath
 
 from hiho_pytorch_base.batch import collate_dataset_output
 from hiho_pytorch_base.config import Config
 from hiho_pytorch_base.dataset import Dataset, create_dataset
 
 
-def check_dataset(config_yaml_path: Path, trials: int, break_on_error: bool) -> None:
+def check_dataset(config_yaml_path: UPath, trials: int, break_on_error: bool) -> None:
     """データセットの整合性をチェックする"""
-    with config_yaml_path.open() as f:
-        config_dict = yaml.safe_load(f)
-
-    config = Config.from_dict(config_dict)
+    config = Config.from_dict(yaml.safe_load(config_yaml_path.read_text()))
 
     preprocess_workers = config.train.preprocess_workers
     batch_size = config.train.batch_size
@@ -92,7 +89,7 @@ def _wrapper(index: int, dataset: Dataset):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_yaml_path", type=Path)
+    parser.add_argument("config_yaml_path", type=UPath)
     parser.add_argument("--trials", type=int, default=3)
     parser.add_argument("--break_on_error", action="store_true")
     check_dataset(**vars(parser.parse_args()))

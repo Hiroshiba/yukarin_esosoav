@@ -13,6 +13,7 @@ import yaml
 from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader, Dataset, Sampler
+from upath import UPath
 
 from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
@@ -148,12 +149,12 @@ def create_data_loader(
     )
 
 
-def setup_training_context(config_yaml_path: Path, output_dir: Path) -> TrainingContext:
+def setup_training_context(
+    config_yaml_path: UPath, output_dir: Path
+) -> TrainingContext:
     """TrainingContextを作成"""
     # config
-    with config_yaml_path.open() as f:
-        config_dict = yaml.safe_load(f)
-    config = Config.from_dict(config_dict)
+    config = Config.from_dict(yaml.safe_load(config_yaml_path.read_text()))
     config.add_git_info()
     config.validate_config()
 
@@ -230,7 +231,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
     # logger
     logger = Logger(
-        config_dict=config_dict,
+        config_dict=config.to_dict(),
         project_category=config.project.category,
         project_name=config.project.name,
         output_dir=output_dir,
@@ -434,7 +435,7 @@ def training_loop(context: TrainingContext) -> None:
             save_checkpoint(context)
 
 
-def train(config_yaml_path: Path, output_dir: Path) -> None:
+def train(config_yaml_path: UPath, output_dir: Path) -> None:
     """機械学習モデルを学習する。スナップショットがあれば再開する。"""
     context = setup_training_context(config_yaml_path, output_dir)
 
@@ -442,8 +443,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
         load_snapshot(context)
 
     output_dir.mkdir(exist_ok=True, parents=True)
-    with (output_dir / "config.yaml").open(mode="w") as f:
-        yaml.safe_dump(context.config.to_dict(), f)
+    (output_dir / "config.yaml").write_text(yaml.safe_dump(context.config.to_dict()))
 
     try:
         training_loop(context)
@@ -453,6 +453,6 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_yaml_path", type=Path)
+    parser.add_argument("config_yaml_path", type=UPath)
     parser.add_argument("output_dir", type=Path)
     train(**vars(parser.parse_args()))
