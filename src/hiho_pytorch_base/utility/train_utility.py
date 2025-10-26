@@ -31,7 +31,10 @@ def reduce_result[T: DataNumProtocol](results: list[T]) -> T:
 
         values = [getattr(r, key) * r.data_num for r in results]
         if isinstance(values[0], torch.Tensor):
-            result_dict[key] = torch.stack(values).sum() / sum_data_num
+            stacked = torch.stack(values)
+            if stacked.is_floating_point() and stacked.dtype != torch.float32:
+                stacked = stacked.float()
+            result_dict[key] = stacked.sum() / sum_data_num
         else:
             result_dict[key] = sum(values) / sum_data_num
 
