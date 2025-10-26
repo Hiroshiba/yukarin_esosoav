@@ -53,7 +53,7 @@ def setup_data_and_config(base_config_path: Path, data_dir: UPath) -> Config:
     # 可変長データの長さを事前に決定
     variable_lengths = {}
     for stem in all_stems:
-        variable_lengths[stem] = int(np.random.default_rng().integers(5, 15))
+        variable_lengths[stem] = int(np.random.default_rng().integers(1, 30))
 
     # 固定長特徴ベクトル
     def generate_feature_vector(file_path: Path) -> None:
