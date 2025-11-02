@@ -73,7 +73,7 @@ class TrainConfig(_Model):
     weight_initializer: str | None = None
     pretrained_predictor_path: UPathField | None = None
     prefetch_workers: int = 256
-    preprocess_workers: int = 0
+    preprocess_workers: int | None = None
     use_gpu: bool = True
     use_amp: bool = True
 

@@ -2,6 +2,7 @@
 
 import argparse
 import multiprocessing
+import os
 import traceback
 from functools import partial
 
@@ -54,7 +55,13 @@ def _check(
 ) -> None:
     wrapper = partial(_wrapper, dataset=dataset)
 
-    pool_processes = None if preprocess_workers == 0 else preprocess_workers
+    num_workers = preprocess_workers
+    if num_workers is None:
+        num_workers = os.cpu_count()
+        if num_workers is None:
+            raise ValueError("Failed to get CPU count")
+
+    pool_processes = None if num_workers == 0 else num_workers
     with multiprocessing.Pool(processes=pool_processes) as pool:
         it = pool.imap_unordered(wrapper, range(len(dataset)), chunksize=2**8)
         for i, error in tqdm(it, desc=desc, total=len(dataset)):
@@ -69,11 +76,11 @@ def _check(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=preprocess_workers if preprocess_workers is not None else 0,
+        num_workers=num_workers,
         collate_fn=collate_dataset_output,
         pin_memory=pin_memory,
         drop_last=drop_last,
-        timeout=0 if preprocess_workers == 0 else 15,
+        timeout=0 if num_workers == 0 else 15,
     )
     for _, _ in tqdm(enumerate(it), desc=desc, total=len(dataset) // batch_size):
         pass

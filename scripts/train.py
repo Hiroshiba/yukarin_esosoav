@@ -1,6 +1,7 @@
 """機械学習モデルの学習メインスクリプト"""
 
 import argparse
+import os
 import threading
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
@@ -135,17 +136,23 @@ def create_data_loader(
         sampler = None
         shuffle = True
 
+    num_workers = config.train.preprocess_workers
+    if num_workers is None:
+        num_workers = os.cpu_count()
+        if num_workers is None:
+            raise ValueError("Failed to get CPU count")
+
     return DataLoader(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         sampler=sampler,
-        num_workers=config.train.preprocess_workers,
+        num_workers=num_workers,
         collate_fn=collate_dataset_output,
         pin_memory=config.train.use_gpu,
         drop_last=for_train,
-        timeout=0 if config.train.preprocess_workers == 0 else 30,
-        persistent_workers=config.train.preprocess_workers > 0,
+        timeout=0 if num_workers == 0 else 30,
+        persistent_workers=num_workers > 0,
     )
 
 
