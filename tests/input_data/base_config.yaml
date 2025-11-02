@@ -24,14 +24,14 @@ dataset:
   frame_length: 50
 
 network:
-  feature_vector_size: 16
-  feature_variable_size: 32
-  hidden_size: 32
+  feature_vector_size: 8
+  feature_variable_size: 16
+  hidden_size: 16
   target_vector_size: 3
-  conformer_block_num: 4
+  conformer_block_num: 2
   conformer_dropout_rate: 0.1
   speaker_size: 3
-  speaker_embedding_size: 8
+  speaker_embedding_size: 4
 
 model: {}
 
