@@ -314,7 +314,7 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
             result: ModelOutput = context.model(batch)
 
         loss = result.loss / gradient_accumulation
-        if loss.isnan():
+        if not loss.isfinite():
             raise ValueError("loss is NaN")
 
         context.scaler.scale(loss).backward()
