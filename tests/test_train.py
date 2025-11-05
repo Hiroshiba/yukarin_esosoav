@@ -89,6 +89,7 @@ def test_e2e_generate(train_output_dir: UPath, tmp_path: Path) -> None:
         dataset_type=DatasetType.EVAL,
         output_dir=generate_output_dir,
         use_gpu=False,
+        num_files=None,
     )
 
     assert generate_output_dir.exists()

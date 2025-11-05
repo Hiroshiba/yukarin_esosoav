@@ -57,7 +57,7 @@ uv run -m scripts.train <config_yaml_path> <output_dir>
 
 ### 推論実行
 ```bash
-uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
+uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu] [--num_files N]
 ```
 
 ### データセットチェック
