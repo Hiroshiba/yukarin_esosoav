@@ -43,6 +43,7 @@ def generate(
     dataset_type: DatasetType,
     output_dir: Path,
     use_gpu: bool,
+    num_files: int | None,
 ):
     """設定にあるデータセットから生成する"""
     if predictor_path is None and model_dir is not None:
@@ -67,6 +68,13 @@ def generate(
     )
 
     dataset = create_dataset(config.dataset).get(dataset_type)
+    if num_files is not None:
+        if num_files > len(dataset):
+            raise ValueError(
+                f"num_files ({num_files}) がデータセットサイズ ({len(dataset)}) を超えています"
+            )
+        dataset.datas = dataset.datas[:num_files]
+
     data_loader = DataLoader(
         dataset=dataset,
         batch_size=1,
@@ -101,4 +109,5 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_type", type=DatasetType, required=True)
     parser.add_argument("--output_dir", required=True, type=Path)
     parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--num_files", type=int, default=None)
     generate(**vars(parser.parse_args()))
