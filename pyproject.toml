@@ -1,5 +1,5 @@
 [project]
-name = "hiho_pytorch_base"
+name = "yukarin_esosoav"
 version = "0.1.0"
 authors = [
     { name = "Hiroshiba", email = "hihokaruta@gmail.com" }
@@ -53,7 +53,7 @@ unfixable = [
 "test/**/test_*.py" = ["D103"] # undocumented-public-function。pytest の対象 test_*() が D103 の対象になり、関数名から内容が自明でも docstring を強制されるため。
 
 [tool.ruff.lint.isort]
-known-first-party = ["hiho_pytorch_base"]
+known-first-party = ["yukarin_esosoav"]
 known-third-party = ["numpy", "torch"]
 
 [tool.ruff.lint.pydocstyle]
@@ -67,4 +67,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel.sources]
-"src/hiho_pytorch_base" = "hiho_pytorch_base"
+"src/hiho_pytorch_base" = "yukarin_esosoav"
