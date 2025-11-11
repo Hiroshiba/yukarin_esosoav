@@ -2,12 +2,10 @@
 
 from torch import Tensor, nn
 
-from hiho_pytorch_base.config import NetworkConfig
-from hiho_pytorch_base.network.acoustic_predictor import (
-    AcousticPredictor,
-)
-from hiho_pytorch_base.network.conformer.encoder import Encoder
-from hiho_pytorch_base.network.vocoder import Vocoder
+from ..config import NetworkConfig
+from .acoustic_predictor import AcousticPredictor
+from .conformer.encoder import Encoder
+from .vocoder import Vocoder
 
 
 class Predictor(nn.Module):

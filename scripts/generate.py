@@ -109,5 +109,5 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_type", type=DatasetType, required=True)
     parser.add_argument("--output_dir", required=True, type=Path)
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--num_files", type=int, default=None)
+    parser.add_argument("--num_files", type=int)
     generate(**vars(parser.parse_args()))

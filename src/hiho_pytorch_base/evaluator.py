@@ -7,11 +7,11 @@ import torch
 from torch import Tensor, nn
 from torch.nn.functional import l1_loss
 
-from hiho_pytorch_base.batch import BatchOutput
-from hiho_pytorch_base.generator import Generator, GeneratorOutput
-from hiho_pytorch_base.utility.audio_utility import log_mel_spectrogram
-from hiho_pytorch_base.utility.pytorch_utility import detach_cpu
-from hiho_pytorch_base.utility.train_utility import DataNumProtocol
+from .batch import BatchOutput
+from .generator import Generator, GeneratorOutput
+from .utility.audio_utility import log_mel_spectrogram
+from .utility.pytorch_utility import detach_cpu
+from .utility.train_utility import DataNumProtocol
 
 
 @dataclass

@@ -1,6 +1,7 @@
 """機械学習モデルの学習メインスクリプト"""
 
 import argparse
+import os
 import threading
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
@@ -14,6 +15,7 @@ from torch import nn
 from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader, Dataset, Sampler
+from upath import UPath
 
 from hiho_pytorch_base.batch import BatchOutput, collate_dataset_output
 from hiho_pytorch_base.config import Config
@@ -157,26 +159,32 @@ def create_data_loader(
         sampler = None
         shuffle = True
 
+    num_workers = config.train.preprocess_workers
+    if num_workers is None:
+        num_workers = os.cpu_count()
+        if num_workers is None:
+            raise ValueError("Failed to get CPU count")
+
     return DataLoader(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         sampler=sampler,
-        num_workers=config.train.preprocess_workers,
+        num_workers=num_workers,
         collate_fn=collate_dataset_output,
         pin_memory=config.train.use_gpu,
         drop_last=for_train,
-        timeout=0 if config.train.preprocess_workers == 0 else 30,
-        persistent_workers=config.train.preprocess_workers > 0,
+        timeout=0 if num_workers == 0 else 30,
+        persistent_workers=num_workers > 0,
     )
 
 
-def setup_training_context(config_yaml_path: Path, output_dir: Path) -> TrainingContext:
+def setup_training_context(
+    config_yaml_path: UPath, output_dir: Path
+) -> TrainingContext:
     """TrainingContextを作成"""
     # config
-    with config_yaml_path.open() as f:
-        config_dict = yaml.safe_load(f)
-    config = Config.from_dict(config_dict)
+    config = Config.from_dict(yaml.safe_load(config_yaml_path.read_text()))
     config.add_git_info()
     config.validate_config()
 
@@ -294,7 +302,7 @@ def setup_training_context(config_yaml_path: Path, output_dir: Path) -> Training
 
     # logger
     logger = Logger(
-        config_dict=config_dict,
+        config_dict=config.to_dict(),
         project_category=config.project.category,
         project_name=config.project.name,
         output_dir=output_dir,
@@ -397,7 +405,7 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
                 pred_wave_list=pred_wave_list,
             )
         discriminator_loss = discriminator_output.loss / gradient_accumulation
-        if discriminator_loss.isnan():
+        if not discriminator_loss.isfinite():
             raise ValueError("discriminator loss is NaN")
 
         context.discriminator_scaler.scale(discriminator_loss).backward()
@@ -418,7 +426,7 @@ def train_one_epoch(context: TrainingContext) -> TrainingResults:
                 pred_wave_list=pred_wave_list,
             )
         generator_loss = generator_output.loss / gradient_accumulation
-        if generator_loss.isnan():
+        if not generator_loss.isfinite():
             raise ValueError("generator loss is NaN")
 
         context.generator_scaler.scale(generator_loss).backward()
@@ -577,7 +585,7 @@ def training_loop(context: TrainingContext) -> None:
             save_checkpoint(context)
 
 
-def train(config_yaml_path: Path, output_dir: Path) -> None:
+def train(config_yaml_path: UPath, output_dir: Path) -> None:
     """機械学習モデルを学習する。スナップショットがあれば再開する。"""
     context = setup_training_context(config_yaml_path, output_dir)
 
@@ -585,8 +593,7 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
         load_snapshot(context)
 
     output_dir.mkdir(exist_ok=True, parents=True)
-    with (output_dir / "config.yaml").open(mode="w") as f:
-        yaml.safe_dump(context.config.to_dict(), f)
+    (output_dir / "config.yaml").write_text(yaml.safe_dump(context.config.to_dict()))
 
     try:
         training_loop(context)
@@ -596,6 +603,6 @@ def train(config_yaml_path: Path, output_dir: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_yaml_path", type=Path)
+    parser.add_argument("config_yaml_path", type=UPath)
     parser.add_argument("output_dir", type=Path)
     train(**vars(parser.parse_args()))

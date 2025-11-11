@@ -67,10 +67,10 @@ train:
   batch_size: 4
   gradient_accumulation: 2
   eval_batch_size: 8
-  log_epoch: 1
-  eval_epoch: 2
+  log_epoch: 2
+  eval_epoch: 4
   snapshot_epoch: 4
-  stop_epoch: 10
+  stop_epoch: 20
   model_save_num: 2
   generator_optimizer:
     name: "RAdamScheduleFree"

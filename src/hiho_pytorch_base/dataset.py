@@ -10,16 +10,12 @@ from pydantic import TypeAdapter
 from torch.utils.data import Dataset as BaseDataset
 from upath import UPath
 
-from hiho_pytorch_base.config import DataFileConfig, DatasetConfig
-from hiho_pytorch_base.data.data import (
-    InputData,
-    OutputData,
-    preprocess,
-)
-from hiho_pytorch_base.data.phoneme import ArpaPhoneme
-from hiho_pytorch_base.data.sampling_data import SamplingData
-from hiho_pytorch_base.data.wave import Wave
-from hiho_pytorch_base.utility.upath_utility import to_local_path
+from .config import DataFileConfig, DatasetConfig
+from .data.data import InputData, OutputData, preprocess
+from .data.phoneme import ArpaPhoneme
+from .data.sampling_data import SamplingData
+from .data.wave import Wave
+from .utility.upath_utility import to_local_path
 
 
 @dataclass

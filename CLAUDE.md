@@ -18,6 +18,9 @@ Conformerエンコーダとボコーダーの統合学習方式を採用：
 
 ## 主なコンポーネント
 
+以下の主要コンポーネントがあります。
+`hiho_pytorch_base`内部のモジュール同士は必ず相対インポートで参照します。
+
 ### 設定管理 (`src/hiho_pytorch_base/config.py`)
 ```python
 DataFileConfig:     # ファイルパス設定
@@ -74,7 +77,7 @@ uv run -m scripts.train <config_yaml_path> <output_dir>
 
 ### 推論実行
 ```bash
-uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu]
+uv run -m scripts.generate --model_dir <model_dir> --output_dir <output_dir> [--use_gpu] [--num_files N]
 ```
 
 ### データセットチェック
@@ -122,11 +125,19 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 
 - **環境のみ提供**: Dockerfileは依存関係とライブラリのインストールのみを行い、学習コードや推論コードは含みません
 - **Git Clone前提**: 実際の利用時は、コンテナ内でGit cloneを実行してコードを取得することを想定しています
-- **最新依存関係**: 参照プロジェクト（yukarin_sosoa、yukarin_sosfd、accent_estimator）に準拠し、最新のCUDA/PyTorchベースイメージを使用
 - **音声処理対応**: libsoundfile1-dev、libasound2-dev等の音声処理ライブラリの整備方法をコメント等で案内
 - **uv使用**: pyproject.tomlベースの依存関係管理にuvを使用し、高速なパッケージインストールを実現
 
-## フォーク時の拡張例
+## フォーク時の使用方法
+
+このフレームワークはフォークして別プロジェクト名でパッケージ化することを想定しています。
+
+### ディレクトリ構造の維持
+
+フォーク後も `src/hiho_pytorch_base/` ディレクトリ名はそのまま維持してください。
+ライブラリ内部は相対インポートで実装されているため、ディレクトリ名を変更する必要はありません。
+
+### 拡張例
 
 このフレームワークを拡張する際の参考：
 
@@ -134,8 +145,17 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 2. **カスタム損失関数**: `model.py`の拡張
 3. **異なるデータ形式**: データローダーの拡張
 
-**フォーク前からある汎用関数の関数名やdocstringは変更してはいけない。**
-追従するときにコンフリクトしてしまうから。
+**注意**: フォーク前からある汎用関数の関数名やdocstringは変更してはいけません。
+追従するときにコンフリクトしてしまうためです。
+
+### パッケージ名の変更方法
+
+フォーク先で別のパッケージ名（例: `my_ml_project`）として配布する場合、`pyproject.toml` を以下のように変更します：
+
+```toml
+[tool.hatch.build.targets.wheel.sources]
+"src/hiho_pytorch_base" = "my_ml_project"
+```
 
 ---
 

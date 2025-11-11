@@ -4,8 +4,8 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
-from hiho_pytorch_base.utility.upath_utility import UPathField
+from .utility.git_utility import get_branch_name, get_commit_id
+from .utility.upath_utility import UPathField
 
 
 class _Model(BaseModel):
@@ -117,7 +117,7 @@ class TrainConfig(_Model):
     pretrained_vocoder_path: UPathField | None = None
     pretrained_discriminator_path: UPathField | None = None
     prefetch_workers: int = 256
-    preprocess_workers: int = 0
+    preprocess_workers: int | None = None
     use_gpu: bool = True
     use_amp: bool = True
 
