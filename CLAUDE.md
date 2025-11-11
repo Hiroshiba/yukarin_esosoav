@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 主なコンポーネント
 
 以下の主要コンポーネントがあります。
-フォーク後は`hiho_pytorch_base`ディレクトリの名称が変わるため、`hiho_pytorch_base`内部のモジュール同士は必ず相対インポートで参照します。
+`hiho_pytorch_base`内部のモジュール同士は必ず相対インポートで参照します。
 
 ### 設定管理 (`src/hiho_pytorch_base/config.py`)
 ```python
@@ -109,7 +109,16 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 - **音声処理対応**: libsoundfile1-dev、libasound2-dev等の音声処理ライブラリの整備方法をコメント等で案内
 - **uv使用**: pyproject.tomlベースの依存関係管理にuvを使用し、高速なパッケージインストールを実現
 
-## フォーク時の拡張例
+## フォーク時の使用方法
+
+このフレームワークはフォークして別プロジェクト名でパッケージ化することを想定しています。
+
+### ディレクトリ構造の維持
+
+フォーク後も `src/hiho_pytorch_base/` ディレクトリ名はそのまま維持してください。
+ライブラリ内部は相対インポートで実装されているため、ディレクトリ名を変更する必要はありません。
+
+### 拡張例
 
 このフレームワークを拡張する際の参考：
 
@@ -117,8 +126,17 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 2. **カスタム損失関数**: `model.py`の拡張
 3. **異なるデータ形式**: データローダーの拡張
 
-**フォーク前からある汎用関数の関数名やdocstringは変更してはいけない。**
-追従するときにコンフリクトしてしまうため。
+**注意**: フォーク前からある汎用関数の関数名やdocstringは変更してはいけません。
+追従するときにコンフリクトしてしまうためです。
+
+### パッケージ名の変更方法
+
+フォーク先で別のパッケージ名（例: `my_ml_project`）として配布する場合、`pyproject.toml` を以下のように変更します：
+
+```toml
+[tool.hatch.build.targets.wheel.sources]
+"src/hiho_pytorch_base" = "my_ml_project"
+```
 
 ---
 
