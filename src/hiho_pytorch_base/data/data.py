@@ -6,7 +6,7 @@ import numpy
 import torch
 from torch import Tensor
 
-from hiho_pytorch_base.data.sampling_data import SamplingData
+from .sampling_data import SamplingData
 
 
 @dataclass

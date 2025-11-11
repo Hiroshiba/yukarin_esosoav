@@ -4,8 +4,8 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hiho_pytorch_base.utility.git_utility import get_branch_name, get_commit_id
-from hiho_pytorch_base.utility.upath_utility import UPathField
+from .utility.git_utility import get_branch_name, get_commit_id
+from .utility.upath_utility import UPathField
 
 
 class _Model(BaseModel):

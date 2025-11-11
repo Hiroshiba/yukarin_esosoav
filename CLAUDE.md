@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 このリポジトリは、フォークして使用することを前提とした**汎用機械学習フレームワーク**のベースです。PyTorchベースでマルチタスク学習、多話者学習に対応したneural networkの学習・推論システムを提供します。
 
-
 ## 主なコンポーネント
+
+以下の主要コンポーネントがあります。
+フォーク後は`hiho_pytorch_base`ディレクトリの名称が変わるため、`hiho_pytorch_base`内部のモジュール同士は必ず相対インポートで参照します。
 
 ### 設定管理 (`src/hiho_pytorch_base/config.py`)
 ```python
@@ -116,7 +118,7 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 3. **異なるデータ形式**: データローダーの拡張
 
 **フォーク前からある汎用関数の関数名やdocstringは変更してはいけない。**
-追従するときにコンフリクトしてしまうから。
+追従するときにコンフリクトしてしまうため。
 
 ---
 

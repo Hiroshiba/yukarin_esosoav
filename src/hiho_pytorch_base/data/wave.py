@@ -6,7 +6,7 @@ import librosa
 import numpy
 import soundfile
 
-from hiho_pytorch_base.data.sampling_data import SamplingData
+from .sampling_data import SamplingData
 
 
 class Wave:
