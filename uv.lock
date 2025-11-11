@@ -691,7 +691,7 @@ wheels = [
 ]
 
 [[package]]
-name = "hiho-pytorch-base"
+name = "hiho_pytorch_base"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

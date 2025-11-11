@@ -1,5 +1,5 @@
 [project]
-name = "hiho-pytorch-base"
+name = "hiho_pytorch_base"
 version = "0.1.0"
 authors = [
     { name = "Hiroshiba", email = "hihokaruta@gmail.com" }
