@@ -62,6 +62,9 @@ convention = "numpy"
 [tool.ruff.format]
 docstring-code-format = true
 
+[tool.uv]
+package = false
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
