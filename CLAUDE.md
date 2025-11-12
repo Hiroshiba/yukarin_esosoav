@@ -135,9 +135,14 @@ uv run pyright && uv run ruff check --fix && uv run ruff format
 フォーク先で別のパッケージ名（例: `repository_name`）として配布する場合、`pyproject.toml` を以下のように変更します：
 
 ```toml
+[project]
+name = "repository_name"
+
 [tool.hatch.build.targets.wheel.sources]
 "src/hiho_pytorch_base" = "repository_name"
 ```
+
+これら以外の変更は不要です。
 
 ---
 
