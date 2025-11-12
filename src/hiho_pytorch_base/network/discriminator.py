@@ -5,7 +5,7 @@ from torch import Tensor, nn
 from torch.nn import AvgPool1d, Conv1d, Conv2d
 from torch.nn.utils import spectral_norm, weight_norm
 
-from hiho_pytorch_base.network.vocoder import get_padding
+from .vocoder import get_padding
 
 LRELU_SLOPE = 0.1
 
@@ -70,7 +70,9 @@ class DiscriminatorP(nn.Module):
                     )
                 ),
                 norm_f(
-                    Conv2d(channels[3], channels[4], (kernel_size, 1), 1, padding=(2, 0))
+                    Conv2d(
+                        channels[3], channels[4], (kernel_size, 1), 1, padding=(2, 0)
+                    )
                 ),
             ]
         )
@@ -188,9 +190,7 @@ class MultiScaleDiscriminator(nn.Module):
         super().__init__()
         self.discriminators = nn.ModuleList(
             [
-                DiscriminatorS(
-                    initial_channel=initial_channel, use_spectral_norm=True
-                ),
+                DiscriminatorS(initial_channel=initial_channel, use_spectral_norm=True),
                 DiscriminatorS(initial_channel=initial_channel),
                 DiscriminatorS(initial_channel=initial_channel),
             ]
